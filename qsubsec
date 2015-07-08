@@ -1,0 +1,496 @@
+#! /usr/bin/env python3
+
+import sys
+import os
+import os.path
+import re
+import subprocess
+from collections import UserList, UserDict
+from enum import Enum
+from string import Formatter
+import itertools
+import argparse
+
+# Set the version number:
+version = '2.2a (2015-07-07)'
+
+# Set the default verbosity:
+debug = False
+verbose = False
+
+# Check we're at least at version 3.3.0 (required for the string formatting functions):
+if (sys.hexversion < 0x03030000):
+	print('ERROR: this script requires at least python 3.3')
+	sys.exit(1)
+
+# Define the error & message functions:
+def error(msg, debug=False):
+	if debug == True: raise
+	sys.stderr.write('ERROR: {}\n'.format(msg))
+	sys.exit(1)
+
+# Set up the command line arguments & parse them:
+parser = argparse.ArgumentParser(description = 'Expand QSUB section templates', fromfile_prefix_chars='@')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-w', '--debug', dest='debug', action='store_true', default=False, help='show extended Python debugging information')
+parser.add_argument('-e', '--executable', dest='qsub_exec', default='qsub', help='remote qsub executable')
+parser.add_argument('-i', '--iterate', dest='iterated_tokens', action='append', help='comma-separaed list or file of iterated values for token')
+action_group = parser.add_mutually_exclusive_group(required=False)
+action_group.add_argument('-d', '--description', dest='show_description', action='store_true', default=False, help='show QSUB template description and exit')
+action_group.add_argument('-t', '--tokens', dest='show_tokens', action='store_true', default=False, help='show QSUB template tokens and exit')
+action_group.add_argument('-c', '--show-code', dest='show_code', action='store_true', default=False, help='print parsed QSUB section generator code and exit')
+action_group.add_argument('-s', '--submit', dest='submit', action='store_true', default=False, help='submit processed job to qsub')
+parser.add_argument(dest='filename', metavar='<filename>', help='QSUB template file')
+args = parser.parse_known_args()
+unknown_args = args[1]
+args = args[0]
+
+# Update the debug level:
+debug = args.debug
+
+# Below are the classes & functions necessary for parsing the qsub template files.
+# NB: They are inline to prevent annoyances installing non-standard python packages on server.
+
+class command(object):
+	def __init__(self, cmd, name, test=True, log=True):
+		self.command = cmd
+		self.name = name
+		self.log = log
+		self.test = test
+	def setCommand(self, cmd): self._command = str(cmd)
+	def setLog(self, log):
+		if log == True: self._log = True
+		else: self._log = False
+	def setTest(self, test):
+		if test == True: self._test = True
+		else: self._test = False
+	def setName(self, name): self._name = name
+	def getCommand(self): return self._command
+	def getLog(self): return self._log
+	def getTest(self): return self._test
+	def getName(self): return self._name
+	def logString(self, status): return 'echo "[`date`]: command {} {}"'.format(self.name, status)
+	def getStrings(self):
+		output = []
+		if self.log == True: output.append(self.logString('started'))
+		if self.test == True: output.append('{} || {{{{ {}; exit 1; }}}}'.format(self.command, self.logString('failed')))
+		else: output.append(self.command)
+		if self.log == True: output.append(self.logString('finished'))
+		return output
+	def getQSUBString(self): return 'command("""{}""", name="{}", test={}, log={})'.format(self.command, self.name, self.test, self.log)
+	command = property(getCommand, setCommand, doc='The QSUB command string')
+	log = property(getLog, setLog, doc='Should the command log its status?')
+	test = property(getTest, setTest, doc='Should the command test for completion?')
+	name = property(getName, setName, doc='The QSUB command Name')
+	strings = property(getStrings, None)
+	qsubstring = property(getQSUBString, None)
+
+class commands(UserList):
+	def __init__(self):
+		super().__init__()
+	def append(self, new):
+		if not isinstance(new, command): raise TypeError('inappropriate command type "{}"'.format(new.__class__.__name__))
+		self.data.append(new)
+	def add(self, cmd, name=None, test=True, log=True):
+		if name == None: name = '{0}'.format(hex(len(self.data) + 1))
+		self.data.append(command(cmd=cmd, name=name, test=test, log=log))
+	def getStrings(self):
+		output = []
+		for command in self.data: output.extend(command.strings)
+		return output
+	def getQSUBStrings(self): return [cmd.qsubstring for cmd in self.data]
+	strings = property(getStrings, None)
+	qsubstrings = property(getQSUBStrings, None)
+
+class logType(Enum):
+	output = 0
+	error = 1
+
+class log(object):
+	def __init__(self, logtype, base=None, file=None):
+		self.logtype = logtype
+		self.base = base
+		self.file = file
+	def setLogtype(self, new):
+		if not isinstance(new, logType): raise TypeError('inappropriate logtype type "{}"'.format(new.__class__.__name__))
+		self._logtype = new
+	def setBase(self, base): self._base = base
+	def setFile(self, file): self._file = file
+	def getLogtype(self): return self._logtype
+	def getBase(self): return self._base
+	def getFile(self): return self._file
+	def getString(self, prefix='#$'):
+		if self.base != None: base_str = self.base
+		else: base_str = '.'
+		if self.file != None: file_str = self.file
+		elif (self.logtype == logType.output): file_str = 'output-{%SNAME%}.log'
+		else: file_str = 'error-{%SNAME%}.log'
+		if self.logtype == logType.output: switch_str = 'o'
+		else: switch_str = 'e'
+		return '{} -{} {}/{}'.format(prefix, switch_str, base_str, file_str)
+	def getQSUBString(self):
+		if self.base == None: base_str = 'None'
+		else: base_str = '"{}"'.format(self.base)
+		if self.file == None: file_str = 'None'
+		else: file_str = '"{}"'.format(self.file)
+		if self.logtype == logType.output: command_str = 'output'
+		else: command_str = 'error'
+		return '{}(base={}, file={})'.format(command_str, base_str, file_str)
+	logtype = property(getLogtype, setLogtype)
+	base = property(getBase, setBase)
+	file = property(getFile, setFile)
+	string = property(getString, None)
+	qsubstring = property(getQSUBString, None)
+
+class option(object):
+	def __init__(self, switch, argument=None, value=None):
+		self.switch = switch
+		self.argument = argument
+		self.value = value
+	def setSwitch(self, switch): self._switch = switch
+	def setArgument(self, argument): self._argument = argument
+	def setValue(self, value): self._value = value
+	def getSwitch(self): return self._switch
+	def getArgument(self): return self._argument
+	def getFullSwitch(self):
+		if self.argument == None: return self.switch
+		return '{} {}'.format(self.switch, self.argument)
+	def getValue(self): return self._value
+	def __str__(self):
+		output = '-{}'.format(self.switch)
+		if self.argument != None: output = '{} {}'.format(output, self.argument)
+		if self.value != None: output = '{}={}'.format(output, self.value)
+		return output
+	def getString(self, prefix='#$'): return '{} {}'.format(prefix, str(self))
+	def getQSUBString(self):
+		opt_str = ['"{}"'.format(self.switch)]
+		if self.argument != None: opt_str.append('argument="{}"'.format(self.argument))
+		if self.value != None: opt_str.append('value="{}"'.format(self.value))
+		return 'option({})'.format(', '.join(opt_str))
+	switch = property(getSwitch, setSwitch)
+	fullswitch = property(getFullSwitch, None)
+	argument = property(getArgument, setArgument)
+	value = property(getValue, setValue)
+	string = property(getString, None)
+	qsubstring = property(getQSUBString, None)
+
+class options(UserList):
+	def __init__(self):
+		super().__init__()
+	def add(self, switch, argument=None, value=None): self.append(option(switch, argument, value))
+	def append(self, new):
+		if not isinstance(new, option): raise TypeError('inappropriate option type "{}"'.format(new.__class__.__name__))
+		if len(self.match(new.fullswitch)) > 0: raise ValueError('duplicate options disallowed')
+		self.data.append(new)
+	def __contains__(self, switch):
+		for option in self.data:
+			if option.fullswitch == switch: return True
+		return False
+	def match(self, fullswitch):
+		output = options()
+		for o in self.data:
+			if o.fullswitch == fullswitch: output.append(o)
+		return output
+	def getStrings(self, prefix='#$'): return [o.getString(prefix=prefix) for o in self.data]
+	def getQSUBStrings(self): return [o.qsubstring for o in self.data]
+	def getSwitches(self): return [o.switch for o in self.data]
+	switches = property(getSwitches, None)
+	strings = property(getStrings, None)
+	qsubstrings = property(getQSUBStrings, None)
+
+class limits(options):
+	def getQSUBString(self):
+		limit_str = ['time="{}"'.format(self.match('l h_rt')[0].value)]
+		if 'l h_vmem' in self: limit_str.append('vmem="{}"'.format(self.match('l h_vmem')[0].value))
+		if 'l nodes' in self: limit_str.append('nodes={}'.format(self.match('l nodes')[0].value))
+		return 'limits({})'.format(', '.join(limit_str))
+	qsubstring = property(getQSUBString, None)
+
+def jobName(name): return option(switch='N', argument=name)
+def timeLimit(time): return option(switch='l', argument='h_rt', value=time)
+def vmemLimit(vmem): return option(switch='l', argument='h_vmem', value=vmem)
+def nodeLimit(nodes): return option(switch='l', argument='nodes', value=nodes)
+def hold(hold): return option(switch='hold_jid', argument=hold)
+
+class requirementType(Enum):
+	none = 0
+	path_absent = 1
+	path_present = 2
+	path_readable = 3
+	path_writable = 4
+	env_set = 5
+	env_unset = 6
+
+class requirement(object):
+	def __init__(self, value, reqtype):
+		self.value = value
+		self.reqtype = reqtype
+	def setValue(self, value): self._value = value
+	def setReqtype(self, reqtype):
+		if not isinstance(reqtype, requirementType): raise TypeError('inappropriate requirement type "{}"'.format(new.__class__.__name__))
+		self._reqtype = reqtype
+	def getValue(self): return self._value
+	def getReqtype(self): return self._reqtype
+	def getString(self):
+		if self.reqtype == requirementType.path_present: return 'if ! test -e {0}; then echo "ERROR: file {0} not found"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.path_absent: return 'if test -e {0}; then echo "ERROR: file {0} exists"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.path_readable: return 'if ! test -r {0}; then echo "ERROR: file {0} not readable"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.path_writable: return 'if ! test -w {0}; then echo "ERROR: file {0} not writable"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.env_set: return 'if [ -z ${{{{{0}+x}}}} ]; then echo "ERROR: environment variable {0} not set"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.env_unset: return 'if [ -n ${{{{{0}+x}}}} ]; then echo "ERROR: environment variable {0} set"; exit 1; fi'.format(self.value)
+		else: raise NotImplementedError('requirement type {} not implemented'.format(self.reqtype))
+	def getQSUBString(self): return 'require("{}", "{}")'.format(self.value, self.reqtype.name)
+	value = property(getValue, setValue)
+	reqtype = property(getReqtype, setReqtype)
+	string = property(getString, None)
+	qsubstring = property(getQSUBString, None)
+
+class requirements(UserList):
+	def __init__(self):
+		super().__init__()
+	def add(self, value, reqtype): self.data.append(requirement(value, reqtype))
+	def append(self, new):
+		if not isinstance(new, requirement): raise TypeError('inappropriate requirement type "{}"'.format(new.__class__.__name__))
+		self.data.append(new)
+	def getStrings(self): return [r.string for r in self.data]
+	def getQSUBStrings(self): return [r.qsubstring for r in self.data]
+	strings = property(getStrings, None)
+	qsubstrings = property(getQSUBStrings, None)
+
+class tokenFormatter(Formatter):
+	@classmethod
+	def extractTokens(cls, s):
+		if isinstance(s, str): s = [s]
+		tokens = set()
+		for i in s:
+			for j in super().parse(s, i):
+				if j[1] != None: tokens.add(j[1])
+		return tokens
+	def format(self, s, t):
+		#First, format the tokens against themselves:
+		t_formatted = {}
+		for t_in in t.keys(): t_formatted[t_in] = super().format(t[t_in], None, **t)
+		if isinstance(s, list):
+			output = []
+			for i in s: output.append(super().format(i, None, **t_formatted))
+			return output
+		return super().format(s, None, **t_formatted)
+	def get_value(self, key, args, kwargs):
+		key = key.upper()
+		return kwargs[key]
+
+class section(object):
+	def __init__(self):
+		self.name = None
+		self.description = None
+		self.options = options()
+		self.limits = limits()
+		self.outfile = log(logType.output)
+		self.errfile = log(logType.error)
+		self.requirements = requirements()
+		self.commands = commands()
+	def setName(self, name): self._name = str(name)
+	def setDescription(self, description):
+		if description == None: self._description = ''
+		else: self._description = str(description)
+	def setOptions(self, new):
+		if not isinstance(new, options): raise TypeError('inappropriate options type "{}"'.format(new.__class__.__name__))
+		self._options = new
+	def setLimits(self, new):
+		if not isinstance(new, options): raise TypeError('inappropriate options type "{}"'.format(new.__class__.__name__))
+		self._limits = new
+	def setOutfile(self, new):
+		if not isinstance(new, log): raise TypeError('inappropriate log file type "{}"'.format(new.__class__.__name__))
+		self._outfile = new
+	def setErrfile(self, new):
+		if not isinstance(new, log): raise TypeError('inappropriate log file type "{}"'.format(new.__class__.__name__))
+		self._errfile = new
+	def setRequirements(self, new):
+		if not isinstance(new, requirements): raise TypeError('inappropriate requirements type "{}"'.format(new.__class__.__name__))
+		self._requirements = new
+	def setCommands(self, new):
+		if not isinstance(new, commands): raise TypeError('inappropriate commands type "{}"'.format(new.__class__.__name__))
+		self._commands = new
+	def getName(self): return self._name
+	def getDescription(self): return self._description
+	def getOptions(self): return self._options
+	def getLimits(self): return self._limits
+	def getOutfile(self): return self._outfile
+	def getErrfile(self): return self._errfile
+	def getRequirements(self): return self._requirements
+	def getCommands(self): return self._commands
+	def getQSUBStrings(self):
+		output = []
+		if self.description == '': desc_str = 'None'
+		else: desc_str = '"{}"'.format(self.description)
+		output.append('section("{}", description={})'.format(self.name, desc_str))
+		output.append(self.limits.qsubstring)
+		output.extend(self.options.qsubstrings)
+		output.append(self.outfile.qsubstring)
+		output.append(self.errfile.qsubstring)
+		output.extend(self.requirements.qsubstrings)
+		output.extend(self.commands.qsubstrings)
+		return output
+	def getNotifyStrings(self):
+		output = []
+		if 'notify' in self.options:
+			output.append('on_stop() {{ echo "[`date`]: imminent SIGSTOP (received SIGUSR1)"; }}')
+			output.append('on_kill() {{ echo "[`date`]: imminent SIGKILL (received SIGUSR2)"; }}')
+			output.append('trap \'on_stop\' SIGUSR1')
+			output.append('trap \'on_kill\' SIGUSR2')
+		return output
+	def getStrings(self):
+		output = []
+		output.append(jobName(self.name).string)
+		output.extend(self.limits.strings)
+		output.extend(self.options.strings)
+		output.append(self.outfile.string)
+		output.append(self.errfile.string)
+		output.extend(self.getNotifyStrings())
+		output.extend(self.requirements.strings)
+		output.append('echo "[`date`]: section {} started"'.format(self.name))
+		output.extend(self.commands.strings)
+		output.append('echo "[`date`]: section {} completed"'.format(self.name))
+		return output
+	def getMissingTokens(self, tokens): return self.getRequiredTokens().difference(set(tokens.keys()))
+	def getRequiredTokens(self):
+		output = tokenFormatter.extractTokens(self.strings)
+		try:
+			output.remove('%SNAME%')
+		except: pass
+		return output
+	def format(self, tokens):
+		if self.name == None: raise ValueError('missing section name')
+		if 'l h_rt' not in self.limits: raise ValueError('missing time limit')
+		if len(self.getMissingTokens(tokens)) > 0: raise KeyError('missing tokens')
+		tokens['%SNAME%'] = self.name
+		f = tokenFormatter()
+		return f.format(self.strings, tokens)
+	name = property(getName, setName)
+	description = property(getDescription, setDescription)
+	options = property(getOptions, setOptions)
+	outfile = property(getOutfile, setOutfile)
+	errfile = property(getErrfile, setErrfile)
+	limits = property(getLimits, setLimits)
+	requirements = property(getRequirements, setRequirements)
+	commands = property(getCommands, setCommands)
+	strings = property(getStrings, None)
+	qsubstrings = property(getQSUBStrings, None)
+	tokens = property(getRequiredTokens, None)
+
+def parseTemplate(data):
+	global __section__
+	def qsub_section(name, description=None):
+		__section__.name = name
+		__section__.description = description
+	def qsub_limits(time, vmem=None, nodes=None):
+		__section__.limits.append(timeLimit(time))
+		if vmem != None: __section__.limits.append(vmemLimit(vmem))
+		if nodes != None: __section__.limits.append(nodeLimit(nodes))
+	def qsub_option(switch, argument=None, value=None):
+		__section__.options.add(switch, argument, value)
+	def qsub_options(options):
+		for opt in options:
+			if isinstance(opt, str): __section__.options.add(opt, None, None)
+			elif len(opt) == 2: __section__.options.add(opt[0], opt[1], None)
+			else: __section__.options.add(opt[0], opt[1], opt[2])
+	def qsub_hold(hold_id):
+		__section__.options.append(hold(hold_id))
+	def qsub_require(value, flag):
+			if flag == 'path_absent': flag = requirementType.path_absent
+			elif flag == 'path_present': flag = requirementType.path_present
+			elif flag == 'path_readable': flag = requirementType.path_readable
+			elif flag == 'path_writable': flag = requirementType.path_writable
+			elif flag == 'env_set': flag = requirementType.env_set
+			elif flag == 'env_unset': flag = requirementType.env_unset
+			else: flag = requirementType.none
+			__section__.requirements.add(value, flag)
+	def qsub_outfile(base, file=None):
+		__section__.outfile = log(logType.output, base=base, file=file)
+	def qsub_errfile(base, file=None):
+		__section__.errfile = log(logType.error, base=base, file=file)
+	def qsub_command(cmd, name=None, test=True, log=True):
+		__section__.commands.add(cmd=cmd, name=name, test=test, log=log)
+	__section__ = section()
+	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'command':qsub_command})
+	return __section__
+
+# Load the section file:
+try:
+	section_file = open(args.filename, 'rt')
+	section_data = section_file.read()
+	section_file.close()
+except: error('failed to read section from file "{}"'.format(args.filename))
+
+# Parse the section data:
+section = parseTemplate(section_data)
+
+# If requested, show the generated qsub description:
+if args.show_description == True:
+	print(section.description)
+	exit(0)
+
+# If requested, show the required tokens:
+if args.show_tokens == True:
+	print('\n'.join(sorted(section.tokens)))
+	exit(0)
+
+# If requested, show the generated qsub code:
+if args.show_code == True:
+	print('\n'.join(section.qsubstrings))
+	exit(0)
+
+# Parse the token values from the command line:
+tokens = {}
+for arg in unknown_args:
+	arg_parts = arg.split('=', 1)
+	if(len(arg_parts) != 2): error('invalid token definition "{0}"'.format(arg))
+	tokens[arg_parts[0].strip()] = [arg_parts[1].strip()]
+if args.iterated_tokens != None:
+	for i in args.iterated_tokens:
+		match = re.match('^([^=]+)=(.*)$', i)
+		token = match.group(1)
+		values = match.group(2).split(',')
+		if(len(values) == 1):
+			try:
+				tokens[token] = []
+				token_file = open(values[0], 'rt')
+				for line in token_file.readlines(): tokens[token].append(line.strip())
+				token_file.close()
+			except: error('failed to read tokens from file "{}"'.format(values[0]))
+		else: tokens[token] = values
+# Generate a set of token dicts:
+if len(tokens) > 0:
+	token_names, token_values = zip(*tokens.items())
+	token_sets = [dict(zip(token_names, token_value)) for token_value in itertools.product(*token_values)]
+else: token_sets = [{}]
+
+# Check that the section necessary data:
+if section.name == None: error('section name is undefined')
+
+# Check that all of the tokens are present:
+missing_tokens = section.getMissingTokens(token_sets[0])
+if len(missing_tokens) != 0: error('missing tokens ({0})'.format(', '.join(sorted(missing_tokens))))
+
+# If requested, submit the job to qsub, otherwise just print it out:
+if args.submit == True:
+	for token_set in token_sets:
+		output_data = '\n'.join(section.format(token_set))		
+		try: qsub_process = subprocess.Popen(args=[args.qsub_exec], stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
+		except: error('failed to spawn subprocess "{}"'.format(args.qsub_exec))
+		try:
+			output_data = qsub_process.communicate(input='\n'.join(section.format(token_set)))
+			print(output_data[0].strip())
+		except:
+			qsub_process.kill()
+			qsub_process.communicate()
+			error('failed to submit job to subprocess "{}"'.format(args.qsub_exec))
+else:
+	if len(token_sets) > 1:
+		for token_set in token_sets:
+			output = []
+			for t in sorted(token_set.keys()): output.append('{}="{}"'.format(t, token_set[t]))
+			f = tokenFormatter()
+			section_name = f.format(section.name, token_set)
+			print('{}: {}'.format(section_name, ', '.join(output)))
+	else: print('\n'.join(section.format(token_sets[0])))
