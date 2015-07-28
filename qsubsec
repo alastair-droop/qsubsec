@@ -12,7 +12,7 @@ import itertools
 import argparse
 
 # Set the version number:
-version = '2.2a (2015-07-07)'
+version = '2.2b (2015-07-28)'
 
 # Set the default verbosity:
 debug = False
@@ -455,7 +455,11 @@ if args.iterated_tokens != None:
 			try:
 				tokens[token] = []
 				token_file = open(values[0], 'rt')
-				for line in token_file.readlines(): tokens[token].append(line.strip())
+				for line in token_file.readlines():
+					line = line.strip()
+					if line == '': continue
+					if line[0] == '#': continue
+					tokens[token].append(line)
 				token_file.close()
 			except: error('failed to read tokens from file "{}"'.format(values[0]))
 		else: tokens[token] = values
