@@ -493,7 +493,7 @@ else:
 	if len(token_sets) > 1:
 		for token_set in token_sets:
 			output = []
-			for t in sorted(token_set.keys()): output.append('{}="{}"'.format(t, token_set[t]))
+			for t in sorted(section.getRequiredTokens()): output.append('{}="{}"'.format(t, token_set[t]))
 			f = tokenFormatter()
 			section_name = f.format(section.name, token_set)
 			print('{}: {}'.format(section_name, ', '.join(output)))
