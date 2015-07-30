@@ -1,0 +1,73 @@
+#! /usr/bin/env python3
+
+import argparse
+from enum import Enum
+from os import listdir
+from os.path import join
+import re
+
+# Set the version number:
+version = '0.1a (2015-07-30)'
+
+# Set up the command line arguments & parse them:
+parser = argparse.ArgumentParser(description = 'Summarise qsubsec job log files')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-l', '--list', dest='list', action='store_true', help='list log files')
+parser.add_argument('-d', '--show-data', dest='show_data', action='store_true', help='output log data')
+action_group = parser.add_mutually_exclusive_group(required=False)
+action_group.add_argument('-r', '--list-running', dest='list_running', action='store_true', help='only list running samples')
+action_group.add_argument('-f', '--list-failed', dest='list_failed', action='store_true', help='only list failed samples')
+action_group.add_argument('-c', '--list-completed', dest='list_completed', action='store_true', help='only list completed samples')
+parser.add_argument(dest='dir', metavar='<log_dir>', help='log directory')
+parser.add_argument(dest='section', metavar='<section>', help='QSUB section name')
+args = parser.parse_args()
+
+class status(Enum):
+	unknown = 'unknown'
+	running = 'running'
+	completed = 'completed'
+	failed = 'failed'
+	
+# Parse a log file:
+def parseLog(filename):
+	with open(filename, 'rt') as file_handle:
+		for line in file_handle: pass
+	log_status = status.unknown
+	if 'completed' in line: log_status = status.completed
+	if 'started' in line: log_status = status.running
+	if 'failed' in line: log_status = status.failed
+	return (line.strip(), log_status)
+
+# Print a log file entry:
+def printSample(sample):
+	if args.show_data == True: print('{}\t{}'.format(sample, output_files[sample]['line']))
+	else: print(output_files[sample]['file'])
+	
+# Read in all the files in the given directory that match the given data:
+output_files = {}
+output_re = re.compile('^output-([^-]+)-({})-([^\.]+)\.log$'.format(args.section))
+totals = {status.running:0, status.completed:0, status.failed:0, status.unknown:0}
+for f in listdir(args.dir):
+	match = output_re.match(f)
+	if match != None:
+		sample = match.group(3)
+		filename = join(args.dir, f)
+		sample_data = parseLog(filename)
+		output_files[sample] = {}
+		output_files[sample]['file'] = filename
+		output_files[sample]['line'] = sample_data[0]
+		output_files[sample]['status'] = sample_data[1]
+		totals[sample_data[1]] += 1
+
+# Report the data:
+if args.list == True:
+	for sample in output_files.keys():
+		sample_status = output_files[sample]['status']
+		if (args.list_running == True) and (sample_status != status.running): continue
+		if (args.list_failed == True) and (sample_status != status.failed): continue
+		if (args.list_completed == True) and (sample_status != status.completed): continue
+		printSample(sample)
+else:
+	for status_type in (status.running, status.completed, status.failed, status.unknown):
+		print('{:9} {}'.format(status_type.name, totals[status_type]))
+	print('{:9} {}'.format('TOTAL', sum([totals[i] for i in totals.keys()])))
