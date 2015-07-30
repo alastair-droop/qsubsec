@@ -1,0 +1,66 @@
+#! /usr/bin/env python3
+
+import argparse
+import subprocess
+from sys import exit
+import xml.etree.ElementTree
+
+# Set the version number:
+version = '0.1a (2015-07-30)'
+
+# Set up the command line arguments & parse them:
+parser = argparse.ArgumentParser(description = 'Display running qsub jobs')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-c', '--column-headers', dest='header', action='store_true', default=False, help='display header line on data')
+action_group = parser.add_mutually_exclusive_group(required=False)
+action_group.add_argument('-n', '--number', dest='count', action='store_true', default=False, help='display job counts, not data')
+action_group.add_argument('-f', '--full', dest='full', action='store_true', default=False, help='display full data')
+args = parser.parse_args()
+
+def error(message): exit('ERROR: {}'.format(message))
+
+# Get the XML data from qstat:
+try: qstat_process = subprocess.Popen(args=['qstat', '-xml'], stdout=subprocess.PIPE, universal_newlines=True)
+except: error('failed to execute subprocess "qsubsec"')
+try: result = qstat_process.communicate(timeout=15)[0]
+except:
+	qstat_process.kill()
+	qstat_process.communicate()
+	error('failed to get job data from qsub')
+
+# Parse the output XML:
+try: xml_root = xml.etree.ElementTree.fromstring(result)
+except: error('failed to parse returned XML')
+
+# Extract job data:
+jobs = {}
+for queue_info in xml_root.findall('queue_info'):
+	for job in queue_info.findall('job_list'):
+		job_id = int(job.find('JB_job_number').text)
+		jobs[job_id] = {}
+		jobs[job_id]['id'] = job_id
+		jobs[job_id]['name'] = job.find('JB_name').text
+		jobs[job_id]['priority'] = float(job.find('JAT_prio').text)
+		jobs[job_id]['owner'] = job.find('JB_owner').text
+		jobs[job_id]['code'] = job.find('state').text
+		jobs[job_id]['state'] = job.attrib['state']
+		jobs[job_id]['start'] = job.find('JAT_start_time').text
+		jobs[job_id]['queue'] = job.find('queue_name').text
+		jobs[job_id]['slots'] = int(job.find('slots').text)
+
+if args.count == True: print(len(jobs))
+else:
+	if len(jobs) != 0:	
+		if args.full == False: columns = ('id', 'state', 'name')
+		else: columns = ('id', 'state', 'name', 'owner', 'priority', 'code', 'start', 'slots', 'queue')
+		col_data = {}
+		for column in columns:
+			col_data[column] = {}
+			col_data[column]['length'] = max([len(str(jobs[j][column])) for j in jobs.keys()])
+			if args.header == True: col_data[column]['length'] = max(col_data[column]['length'], len(column))
+			col_data[column]['format_str'] = '{{{}:{}}}'.format(column, col_data[column]['length'])
+			col_data[column]['header_str'] = '{{:{}}}'.format(col_data[column]['length']).format(column)
+		sep_char = ' '
+		if args.header == True: print(sep_char.join([col_data[c]['header_str'] for c in columns]))
+		output_str = sep_char.join([col_data[c]['format_str'] for c in columns])
+		for job_id in jobs: print(output_str.format(**jobs[job_id]))
