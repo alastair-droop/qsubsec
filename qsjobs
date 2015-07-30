@@ -6,15 +6,15 @@ from sys import exit
 import xml.etree.ElementTree
 
 # Set the version number:
-version = '0.1a (2015-07-30)'
+version = '0.1b (2015-07-30)'
 
 # Set up the command line arguments & parse them:
 parser = argparse.ArgumentParser(description = 'Display running qsub jobs')
 parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
-parser.add_argument('-c', '--column-headers', dest='header', action='store_true', default=False, help='display header line on data')
+parser.add_argument('-f', '--full', dest='full', action='store_true', default=False, help='display extended output')
 action_group = parser.add_mutually_exclusive_group(required=False)
+action_group.add_argument('-c', '--column-headers', dest='header', action='store_true', default=False, help='display header line on data')
 action_group.add_argument('-n', '--number', dest='count', action='store_true', default=False, help='display job counts, not data')
-action_group.add_argument('-f', '--full', dest='full', action='store_true', default=False, help='display full data')
 args = parser.parse_args()
 
 def error(message): exit('ERROR: {}'.format(message))
@@ -34,21 +34,37 @@ except: error('failed to parse returned XML')
 
 # Extract job data:
 jobs = {}
+def addJob(job):
+	job_id = int(job.find('JB_job_number').text)
+	jobs[job_id] = {}
+	jobs[job_id]['id'] = job_id
+	jobs[job_id]['name'] = job.find('JB_name').text
+	jobs[job_id]['priority'] = float(job.find('JAT_prio').text)
+	jobs[job_id]['owner'] = job.find('JB_owner').text
+	jobs[job_id]['code'] = job.find('state').text
+	jobs[job_id]['state'] = job.attrib['state']
+	try: jobs[job_id]['start'] = job.find('JAT_start_time').text
+	except: jobs[job_id]['start'] = ''
+	jobs[job_id]['queue'] = job.find('queue_name').text
+	if jobs[job_id]['queue'] == None: jobs[job_id]['queue'] = ''
+	jobs[job_id]['slots'] = int(job.find('slots').text)
+for job_info in xml_root.findall('job_info'):
+	for job in job_info.findall('job_list'): addJob(job)
 for queue_info in xml_root.findall('queue_info'):
-	for job in queue_info.findall('job_list'):
-		job_id = int(job.find('JB_job_number').text)
-		jobs[job_id] = {}
-		jobs[job_id]['id'] = job_id
-		jobs[job_id]['name'] = job.find('JB_name').text
-		jobs[job_id]['priority'] = float(job.find('JAT_prio').text)
-		jobs[job_id]['owner'] = job.find('JB_owner').text
-		jobs[job_id]['code'] = job.find('state').text
-		jobs[job_id]['state'] = job.attrib['state']
-		jobs[job_id]['start'] = job.find('JAT_start_time').text
-		jobs[job_id]['queue'] = job.find('queue_name').text
-		jobs[job_id]['slots'] = int(job.find('slots').text)
-
-if args.count == True: print(len(jobs))
+	for job in queue_info.findall('job_list'): addJob(job)
+	
+if args.count == True:
+	if args.full == False: print(len(jobs))
+	else:
+		totals = {}
+		max_len = 0
+		for job_id in jobs.keys():
+			state = jobs[job_id]['state']
+			if state not in totals.keys():
+				totals[state] = 1
+				max_len = max(max_len, len(state))
+			else: totals[state] += 1
+		for state in sorted(totals.keys()): print('{{:{}}}\t{{}}'.format(max_len).format(state, totals[state]))
 else:
 	if len(jobs) != 0:	
 		if args.full == False: columns = ('id', 'state', 'name')
@@ -63,4 +79,4 @@ else:
 		sep_char = ' '
 		if args.header == True: print(sep_char.join([col_data[c]['header_str'] for c in columns]))
 		output_str = sep_char.join([col_data[c]['format_str'] for c in columns])
-		for job_id in jobs: print(output_str.format(**jobs[job_id]))
+		for job_id in sorted(jobs.keys()): print(output_str.format(**jobs[job_id]))
