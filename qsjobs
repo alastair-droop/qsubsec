@@ -57,7 +57,7 @@ if args.count == True:
 	if args.full == False: print(len(jobs))
 	else:
 		totals = {}
-		max_len = 5
+		max_len = 0
 		for job_id in jobs.keys():
 			state = jobs[job_id]['state']
 			if state not in totals.keys():
@@ -65,7 +65,6 @@ if args.count == True:
 				max_len = max(max_len, len(state))
 			else: totals[state] += 1
 		for state in sorted(totals.keys()): print('{{:{}}}\t{{}}'.format(max_len).format(state, totals[state]))
-		print('{{:{}}}\t{{}}'.format(max_len).format('TOTAL', len(jobs)))
 else:
 	if len(jobs) != 0:	
 		if args.full == False: columns = ('id', 'state', 'name')
