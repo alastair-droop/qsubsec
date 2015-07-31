@@ -7,7 +7,7 @@ from os.path import join
 import re
 
 # Set the version number:
-version = '0.1a (2015-07-30)'
+version = '0.2 (2015-07-31)'
 
 # Set up the command line arguments & parse them:
 parser = argparse.ArgumentParser(description = 'Summarise qsubsec job log files')
@@ -27,6 +27,7 @@ class status(Enum):
 	running = 'running'
 	completed = 'completed'
 	failed = 'failed'
+
 	
 # Parse a log file:
 def parseLog(filename):
@@ -40,13 +41,14 @@ def parseLog(filename):
 
 # Print a log file entry:
 def printSample(sample):
-	if args.show_data == True: print('{}\t{}'.format(sample, output_files[sample]['line']))
+	if args.show_data == True: print('{{:{}}}\t{{}}'.format(sample_nmax).format(sample, output_files[sample]['line']))
 	else: print(output_files[sample]['file'])
-	
+
 # Read in all the files in the given directory that match the given data:
 output_files = {}
 output_re = re.compile('^output-([^-]+)-({})-([^\.]+)\.log$'.format(args.section))
 totals = {status.running:0, status.completed:0, status.failed:0, status.unknown:0}
+sample_nmax = 0
 for f in listdir(args.dir):
 	match = output_re.match(f)
 	if match != None:
@@ -58,6 +60,7 @@ for f in listdir(args.dir):
 		output_files[sample]['line'] = sample_data[0]
 		output_files[sample]['status'] = sample_data[1]
 		totals[sample_data[1]] += 1
+		sample_nmax = max(sample_nmax, len(str(sample)))
 
 # Report the data:
 if args.list == True:
