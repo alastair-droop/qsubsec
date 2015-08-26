@@ -6,13 +6,15 @@ import os.path
 import re
 import subprocess
 from collections import UserList, UserDict
+from urllib.request import urlopen
+from urllib.parse import urlparse
 from enum import Enum
 from string import Formatter
 import itertools
 import argparse
 
 # Set the version number:
-version = '2.2b (2015-07-28)'
+version = '2.3a (2015-08-26)'
 
 # Set the default verbosity:
 debug = False
@@ -40,7 +42,7 @@ action_group.add_argument('-d', '--description', dest='show_description', action
 action_group.add_argument('-t', '--tokens', dest='show_tokens', action='store_true', default=False, help='show QSUB template tokens and exit')
 action_group.add_argument('-c', '--show-code', dest='show_code', action='store_true', default=False, help='print parsed QSUB section generator code and exit')
 action_group.add_argument('-s', '--submit', dest='submit', action='store_true', default=False, help='submit processed job to qsub')
-parser.add_argument(dest='filename', metavar='<filename>', help='QSUB template file')
+parser.add_argument(dest='filename', metavar='<filename>', help='QSUB template file (or URL)')
 args = parser.parse_known_args()
 unknown_args = args[1]
 args = args[0]
@@ -417,9 +419,17 @@ def parseTemplate(data):
 
 # Load the section file:
 try:
-	section_file = open(args.filename, 'rt')
-	section_data = section_file.read()
-	section_file.close()
+	section_file_parsed = urlparse(args.filename)
+	if section_file_parsed.netloc == '':
+		# The file is local:
+		section_file = open(args.filename, 'rt')
+		section_data = section_file.read()
+		section_file.close()
+	else:
+		# The file is a remote URL:
+		section_file = urlopen(args.filename)
+		section_data = section_file.read().decode('ASCII')
+		section_file.close()
 except: error('failed to read section from file "{}"'.format(args.filename))
 
 # Parse the section data:
