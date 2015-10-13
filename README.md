@@ -64,32 +64,4 @@ Adds a command to the script. The command is specified by cmd. If name is specif
 Examples
 --------
 
-A simple "Hello, World" `qsubsec` script is:
-
-    section("{NAME}_{STRING}", "This is a test script")
-    limits(time="00:00:10", vmem="10M")
-    options(["V", "cwd"])
-    command("""echo "{STRING}" > ~/{NAME}_{STRING}.txt""", test=True, log=True)
-
-The command `qsubsec test.qsubsec NAME=N STRING=Hello` will generate the following output:
-
-    #$ -N N_Hello
-    #$ -N N_Hello
-    #$ -l h_rt=00:00:10
-    #$ -l h_vmem=10M
-    #$ -V
-    #$ -cwd
-    #$ -o ./output-N_Hello.log
-    #$ -e ./error-N_Hello.log
-    echo "[`date`]: section N_Hello started"
-    echo "[`date`]: command 0x1 started"
-    echo "Hello" > ~/N_Hello.txt || { echo "[`date`]: command 0x1 failed"; exit 1; }
-    echo "[`date`]: command 0x1 finished"
-    echo "[`date`]: section N_Hello completed"
-    echo "[`date`]: section N_Hello started"
-    echo "[`date`]: command 0x1 started"
-    echo "Hello" > ~/N_Hello.txt || { echo "[`date`]: command 0x1 failed"; exit 1; }
-    echo "[`date`]: command 0x1 finished"
-    echo "[`date`]: section N_Hello completed"
-
-
+The examples directory contains several example scripts.
