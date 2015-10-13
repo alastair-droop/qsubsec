@@ -1,0 +1,17 @@
+section('sectionB-{ID}', description='section B')
+limits(time='00:00:30', vmem='100M')
+options(['V', 'cwd', 'notify'])
+output('{BASE}/logs')
+error('{BASE}/logs')
+
+# Wait until section A has finished:
+hold('sectionA-{ID}')
+
+# Check that section A finished successfully:
+require('{BASE}/flags/{ID}.A', 'path_present')
+
+# Perform the first processing step:
+command('echo "section B results" >> {BASE}/output/{ID}.txt', name='sectionB-processing', test=True, log=True)
+
+# Write a flag to say we finished OK:
+command('touch {BASE}/flags/{ID}.B', name='sectionB-flag', test=True, log=True)
