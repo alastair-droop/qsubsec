@@ -16,11 +16,12 @@
 import argparse
 from enum import Enum
 from os import listdir
-from os.path import join
+from os.path import join, expandvars, splitext
 import re
+from sys import exit
 
 # Set the version number:
-version = '0.3 (2015-08-03)'
+version = '0.4 (2016-02-12)'
 
 # Set up the command line arguments & parse them:
 parser = argparse.ArgumentParser(description = 'Summarise qsubsec job log files')
@@ -33,8 +34,7 @@ action_group.add_argument('-f', '--list-failed', dest='list_failed', action='sto
 action_group.add_argument('-c', '--list-completed', dest='list_completed', action='store_true', help='only list completed samples')
 action_group.add_argument('-k', '--list-killed', dest='list_killed', action='store_true', help='only list killed samples')
 action_group.add_argument('-u', '--list-unknown', dest='list_unknown', action='store_true', help='only list unknown samples')
-parser.add_argument(dest='dir', metavar='<log_dir>', help='log directory')
-parser.add_argument(dest='section', metavar='<section>', help='QSUB section name')
+parser.add_argument(dest='files', nargs='+', metavar='<logs>', help='log files')
 args = parser.parse_args()
 
 class status(Enum):
@@ -54,42 +54,33 @@ def parseLog(filename):
 	if 'started' in line: log_status = status.running
 	if 'failed' in line: log_status = status.failed
 	if ('imminent SIGSTOP' in line) or ('imminent SIGKILL' in line): log_status = status.killed 
-	return (line.strip(), log_status)
+	return (filename, line.strip(), log_status)
 
 # Print a log file entry:
 def printSample(sample):
-	if args.show_data == True: print('{{:{}}}\t{{}}'.format(sample_nmax).format(sample, output_files[sample]['line']))
-	else: print(output_files[sample]['file'])
+	if args.show_data == True: print('{{:{}}}\t{{}}'.format(sample_nmax).format(sample[0], sample[1]))
+	else: print(sample[1])
 
 # Read in all the files in the given directory that match the given data:
-output_files = {}
-output_re = re.compile('^output-([^-]+)-({})-([^\.]+)\.log$'.format(args.section))
+file_data = []
 totals = {status.running:0, status.completed:0, status.failed:0, status.killed:0, status.unknown:0}
 sample_nmax = 0
-for f in listdir(args.dir):
-	match = output_re.match(f)
-	if match != None:
-		sample = match.group(3)
-		filename = join(args.dir, f)
-		sample_data = parseLog(filename)
-		output_files[sample] = {}
-		output_files[sample]['file'] = filename
-		output_files[sample]['line'] = sample_data[0]
-		output_files[sample]['status'] = sample_data[1]
-		totals[sample_data[1]] += 1
-		sample_nmax = max(sample_nmax, len(str(sample)))
-
+for filename in args.files:
+        sample_data = parseLog(filename)
+        file_data.append(sample_data)
+        totals[sample_data[2]] += 1
+        sample_nmax = max(sample_nmax, len(str(filename)))
 # Report the data:
 if args.list == True:
-	for sample in output_files.keys():
-		sample_status = output_files[sample]['status']
-		if (args.list_running == True) and (sample_status != status.running): continue
-		if (args.list_failed == True) and (sample_status != status.failed): continue
-		if (args.list_completed == True) and (sample_status != status.completed): continue
-		if (args.list_killed == True) and (sample_status != status.killed): continue
-		if (args.list_unknown == True) and (sample_status != status.unknown): continue
-		printSample(sample)
+    for f_dat in file_data:
+        sample_status = f_dat[2]
+        if (args.list_running == True) and (sample_status != status.running): continue
+        if (args.list_failed == True) and (sample_status != status.failed): continue
+        if (args.list_completed == True) and (sample_status != status.completed): continue
+        if (args.list_killed == True) and (sample_status != status.killed): continue
+        if (args.list_unknown == True) and (sample_status != status.unknown): continue
+        printSample(f_dat)
 else:
-	for status_type in (status.running, status.completed, status.failed, status.killed, status.unknown):
-		print('{:9} {}'.format(status_type.name, totals[status_type]))
-	print('{:9} {}'.format('TOTAL', sum([totals[i] for i in totals.keys()])))
+    for status_type in (status.running, status.completed, status.failed, status.killed, status.unknown):
+        print('{:9} {}'.format(status_type.name, totals[status_type]))
+    print('{:9} {}'.format('TOTAL', sum([totals[i] for i in totals.keys()])))
