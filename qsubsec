@@ -27,7 +27,7 @@ import itertools
 import argparse
 
 # Set the version number:
-version = '2.3a (2015-08-26)'
+version = '2.4a (2016-04-06)'
 
 # Set the default verbosity:
 debug = False
@@ -126,6 +126,7 @@ class log(object):
 		self.logtype = logtype
 		self.base = base
 		self.file = file
+		self.setTaskArray(False)
 	def setLogtype(self, new):
 		if not isinstance(new, logType): raise TypeError('inappropriate logtype type "{}"'.format(new.__class__.__name__))
 		self._logtype = new
@@ -134,12 +135,18 @@ class log(object):
 	def getLogtype(self): return self._logtype
 	def getBase(self): return self._base
 	def getFile(self): return self._file
+	def getTaskArray(self): return self._taskarray
+	def setTaskArray(self, taskarray): self._taskarray = bool(taskarray)
 	def getString(self, prefix='#$'):
 		if self.base != None: base_str = self.base
 		else: base_str = '.'
 		if self.file != None: file_str = self.file
-		elif (self.logtype == logType.output): file_str = 'output-{%SNAME%}.log'
-		else: file_str = 'error-{%SNAME%}.log'
+		elif (self.logtype == logType.output):
+			if self.taskarray == True: file_str = 'output-{%SNAME%}-$TASK_ID.log'
+			else: file_str = 'output-{%SNAME%}.log'
+		else:
+			if self.taskarray == True: file_str = 'error-{%SNAME%}-$TASK_ID.log'
+			else: file_str = 'error-{%SNAME%}.log'
 		if self.logtype == logType.output: switch_str = 'o'
 		else: switch_str = 'e'
 		return '{} -{} {}/{}'.format(prefix, switch_str, base_str, file_str)
@@ -156,6 +163,7 @@ class log(object):
 	file = property(getFile, setFile)
 	string = property(getString, None)
 	qsubstring = property(getQSUBString, None)
+	taskarray = property(getTaskArray, setTaskArray)
 
 class option(object):
 	def __init__(self, switch, argument=None, value=None):
@@ -424,10 +432,13 @@ def parseTemplate(data):
 		__section__.outfile = log(logType.output, base=base, file=file)
 	def qsub_errfile(base, file=None):
 		__section__.errfile = log(logType.error, base=base, file=file)
+	def qsub_default_outputs(base):
+		__section__.outfile = log(logType.output, base=base, file=None)
+		__section__.errfile = log(logType.error, base=base, file=None)        
 	def qsub_command(cmd, name=None, test=True, log=True):
 		__section__.commands.add(cmd=cmd, name=name, test=test, log=log)
 	__section__ = section()
-	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'command':qsub_command})
+	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'output':qsub_default_outputs, 'command':qsub_command})
 	return __section__
 
 # Load the section file:
@@ -447,6 +458,11 @@ except: error('failed to read section from file "{}"'.format(args.filename))
 
 # Parse the section data:
 section = parseTemplate(section_data)
+
+# Update the status of the log taskarray value:
+if 't' in section.options.switches:
+	section.outfile.taskarray = True
+	section.errfile.taskarray = True
 
 # If requested, show the generated qsub description:
 if args.show_description == True:
