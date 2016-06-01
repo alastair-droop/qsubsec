@@ -1,71 +1,188 @@
 #! /usr/bin/env python3
 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-import sys
-import os
-import os.path
-import re
-import subprocess
-from collections import UserList, UserDict
-from urllib.request import urlopen
-from urllib.parse import urlparse
+from collections import UserDict, UserList
+from copy import deepcopy
 from enum import Enum
 from string import Formatter
-import itertools
+from urllib.parse import urlparse
+from urllib.request import urlopen
 import argparse
+import re
+import subprocess
+import sys
 
-# Set the version number:
-version = '2.4a (2016-04-06)'
+# Set the script version number:
+version = '2.6 (2016-06-01)'
 
-# Set the default verbosity:
-debug = False
-verbose = False
+########################################################################################################################
+# Tokens:
 
-# Check we're at least at version 3.3.0 (required for the string formatting functions):
-if (sys.hexversion < 0x03030000):
-	print('ERROR: this script requires at least python 3.3')
-	sys.exit(1)
+# Set the token error types:
+class TokenError(Exception):
+	"""Base class for exceptions relating to supplied tokens"""
+	def __init__(self, tokens):
+		self.tokens = tokens
 
-# Define the error & message functions:
-def error(msg, debug=False):
-	if debug == True: raise
-	sys.stderr.write('ERROR: {}\n'.format(msg))
-	sys.exit(1)
+class MissingTokenError(TokenError):
+	"""Exception raised when missing necessary tokens"""
+	pass
 
-# Set up the command line arguments & parse them:
-parser = argparse.ArgumentParser(description = 'Expand QSUB section templates', fromfile_prefix_chars='@')
-parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
-parser.add_argument('-w', '--debug', dest='debug', action='store_true', default=False, help='show extended Python debugging information')
-parser.add_argument('-e', '--executable', dest='qsub_exec', default='qsub', help='remote qsub executable')
-parser.add_argument('-i', '--iterate', dest='iterated_tokens', action='append', help='comma-separaed list or file of iterated values for token')
-action_group = parser.add_mutually_exclusive_group(required=False)
-action_group.add_argument('-d', '--description', dest='show_description', action='store_true', default=False, help='show QSUB template description and exit')
-action_group.add_argument('-t', '--tokens', dest='show_tokens', action='store_true', default=False, help='show QSUB template tokens and exit')
-action_group.add_argument('-c', '--show-code', dest='show_code', action='store_true', default=False, help='print parsed QSUB section generator code and exit')
-action_group.add_argument('-s', '--submit', dest='submit', action='store_true', default=False, help='submit processed job to qsub')
-parser.add_argument(dest='filename', metavar='<filename>', help='QSUB template file (or URL)')
-args = parser.parse_known_args()
-unknown_args = args[1]
-args = args[0]
+class CyclicTokenDependencyError(TokenError):
+	"""Exception raised when supplied tokens form a cyclic graph"""
+	pass
 
-# Update the debug level:
-debug = args.debug
+# Token formatter class:
+class tokenFormatter(Formatter):
+	"""This class overloads the base String Formatter class to provide token-specific formatting."""
+	@classmethod
+	def extractTokens(cls, s):
+		if isinstance(s, str): s = [s]
+		tokens = set()
+		for i in s:
+			for j in super().parse(s, i):
+				if j[1] != None: tokens.add(j[1])
+		return tokens
+	def get_value(self, key, args, kwargs):
+		return kwargs[key]
+	def format(self, string, token_dict):
+		return super().format(string, None, **token_dict)
 
-# Below are the classes & functions necessary for parsing the qsub template files.
-# NB: They are inline to prevent annoyances installing non-standard python packages on server.
 
+# A single set of tokens, in which each token has a single value:
+class tokenDict(UserDict):
+	"""This class encapsulates a single set of tokens, each of which has a single value"""
+	def __init__(self, data={}, formatter=None):
+		if formatter == None: self.formatter = tokenFormatter()
+		else: self.formatter = formatter
+		self.data = data
+	def setFormatter(self, formatter): self._formatter = formatter
+	def getFormatter(self): return self._formatter
+	def add(self, token, value): self.data[token] = str(value)
+	def getTokens(self): return set(self.data.keys())
+	def buildDependencyGraph(self):
+		output = {}
+		for token in self.tokens:
+			output[token] = tokenFormatter.extractTokens(self.data[token])
+		return output
+	def pruneDependencyGraph(self, g):
+		leaf_tokens = set()
+		for token in g.keys():
+			if len(g[token]) == 0:
+				leaf_tokens |= set([token])
+				for i in g.keys(): g[i] -= set([token])
+		for leaf in leaf_tokens: del g[leaf]
+		return((leaf_tokens, g))
+	def getDependencies(self):
+		g = self.buildDependencyGraph()
+		dependencies = set()
+		for token in g.keys(): dependencies |= g[token]
+		return dependencies
+	def isComplete(self): return len(self.getDependencies() - self.tokens) == 0
+	def isCyclic(self):
+		g = self.buildDependencyGraph()
+		while True:
+			res = self.pruneDependencyGraph(g)
+			if len(res[1]) == 0: return False
+			if len(res[0]) == 0: return True
+			g = res[1]
+	def update(self):
+		if self.complete != True: raise MissingTokenError(self.getDependencies() - self.tokens)
+		if self.cyclic == True: raise CyclicTokenDependencyError(self.tokens)
+		while True:
+			altered = False
+			for key in sorted(self.tokens):
+				old_value = self.data[key]
+				new_value = self.formatter.format(old_value, self.data)
+				if(new_value != old_value):
+					altered = True
+					self.data[key] = new_value
+			if altered == False: break
+	def format(self, s):
+		self.update()
+		necessary_tokens = tokenFormatter.extractTokens(s)
+		missing_tokens = necessary_tokens - self.tokens
+		if len(missing_tokens) > 0: raise MissingTokenError(missing_tokens)
+		return self.formatter.format(s, self.data)
+	def __str__(self): return 'token dictionary containing {} tokens: ({})'.format(len(self.data), ', '.join(self.tokens))
+	def valueString(self):
+		return ', '.join(['{}="{}"'.format(i, self.data[i]) for i in sorted(self.tokens)])
+		# return ', '.join(output)
+		# return 'token dictionary containing {} tokens: ({})'.format(len(self.data), ', '.join(output))
+	tokens = property(getTokens, None)
+	formatter = property(getFormatter, setFormatter)
+	complete = property(isComplete, None)
+	cyclic = property(isCyclic, None)
+
+# A set of tokens that correctly parses multiple token values into multiple token dicts:
+class tokenSet(object):
+	"""This class encapsulates a set of tokens, each of which can have multiple values."""
+	def __init__(self, formatter=None):
+		if formatter == None: self.formatter = tokenFormatter()
+		else: self.formatter = formatter
+		self._tokendicts = []
+		self.newTokenDict()
+	def setFormatter(self, formatter): self._formatter = formatter
+	def getFormatter(self): return self._formatter
+	def getTokenDicts(self): return self._tokendicts
+	def newTokenDict(self, data={}):
+		self.tokenDicts.append(tokenDict(data=data, formatter=self.formatter))		
+	def add(self, key, value):
+		for tokendict in self.tokenDicts:
+			tokendict.add(key, value)
+	def addIterated(self, key, values):
+		new_dicts = []
+		for value in values:
+			for old_dict in self.tokenDicts:
+				new_dict = deepcopy(old_dict)
+				new_dict.add(key, value)
+				new_dicts.append(new_dict)
+		self._tokendicts = new_dicts
+	def addFromString(self, s):
+		arg_parts = s.split('=', 1)
+		if(len(arg_parts) != 2): raise ValueError('invalid token definition "{0}"'.format(arg))
+		self.add(arg_parts[0].strip(), arg_parts[1].strip())
+	def addIteratedFromFile(self, key, filename):
+		token_values = set()
+		with open(filename, 'rt') as f:
+			for line in f.readlines():
+				line = line.strip()
+				if line == '': continue
+				if line[0] == '#': continue
+				token_values |= set([line])
+		self.addIterated(key, token_values)
+	def addIteratedFromString(self, s):
+		match = re.match('^([^=]+)=(.*)$', s)
+		token = match.group(1)
+		values = match.group(2).split(',')
+		if(len(values) == 1):
+			try: self.addIteratedFromFile(token, values[0])
+			except: raise ValueError('failed to read tokens from file "{}"'.format(values[0]))
+		else: self.addIterated(token, values)
+	def update(self):
+		for tokendict in self.tokenDicts: tokendict.update()
+	def showValues(self):
+		print('{}:'.format(self.__str__()))
+		for td in self.tokenDicts:
+			print('  {}'.format(td.valueStrings()))
+	def __iter__(self):
+		self._current_key = 0
+		return self
+	def __next__(self):
+		if self._current_key >= len(self): raise StopIteration()
+		self._current_key += 1
+		return self[self._current_key - 1]
+	def __len__(self): return len(self.tokenDicts)
+	def __str__(self): return 'token set with {} permutations'.format(len(self))
+	def __getitem__(self, key): return self._tokendicts[key]
+	formatter = property(getFormatter, setFormatter)
+	tokenDicts = property(getTokenDicts, None)
+	
+########################################################################################################################
+# Sections:
+
+class MissingSectionNameError(Exception): pass
+class MissingSectionTimeLimitError(Exception): pass
+	
 class command(object):
 	def __init__(self, cmd, name, test=True, log=True):
 		self.command = cmd
@@ -88,7 +205,7 @@ class command(object):
 	def getStrings(self):
 		output = []
 		if self.log == True: output.append(self.logString('started'))
-		if self.test == True: output.append('{} || {{{{ {}; exit 1; }}}}'.format(self.command, self.logString('failed')))
+		if self.test == True: output.append('{} || {{ {}; exit 1; }}'.format(self.command, self.logString('failed')))
 		else: output.append(self.command)
 		if self.log == True: output.append(self.logString('finished'))
 		return output
@@ -259,8 +376,8 @@ class requirement(object):
 		elif self.reqtype == requirementType.path_absent: return 'if test -e {0}; then echo "ERROR: file {0} exists"; exit 1; fi'.format(self.value)
 		elif self.reqtype == requirementType.path_readable: return 'if ! test -r {0}; then echo "ERROR: file {0} not readable"; exit 1; fi'.format(self.value)
 		elif self.reqtype == requirementType.path_writable: return 'if ! test -w {0}; then echo "ERROR: file {0} not writable"; exit 1; fi'.format(self.value)
-		elif self.reqtype == requirementType.env_set: return 'if [ -z ${{{{{0}+x}}}} ]; then echo "ERROR: environment variable {0} not set"; exit 1; fi'.format(self.value)
-		elif self.reqtype == requirementType.env_unset: return 'if [ -n ${{{{{0}+x}}}} ]; then echo "ERROR: environment variable {0} set"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.env_set: return 'if [ -z ${{{0}+x}} ]; then echo "ERROR: environment variable {0} not set"; exit 1; fi'.format(self.value)
+		elif self.reqtype == requirementType.env_unset: return 'if [ -n ${{{0}+x}} ]; then echo "ERROR: environment variable {0} set"; exit 1; fi'.format(self.value)
 		else: raise NotImplementedError('requirement type {} not implemented'.format(self.reqtype))
 	def getQSUBString(self): return 'require("{}", "{}")'.format(self.value, self.reqtype.name)
 	value = property(getValue, setValue)
@@ -280,28 +397,6 @@ class requirements(UserList):
 	strings = property(getStrings, None)
 	qsubstrings = property(getQSUBStrings, None)
 
-class tokenFormatter(Formatter):
-	@classmethod
-	def extractTokens(cls, s):
-		if isinstance(s, str): s = [s]
-		tokens = set()
-		for i in s:
-			for j in super().parse(s, i):
-				if j[1] != None: tokens.add(j[1])
-		return tokens
-	def format(self, s, t):
-		#First, format the tokens against themselves:
-		t_formatted = {}
-		for t_in in t.keys(): t_formatted[t_in] = super().format(t[t_in], None, **t)
-		if isinstance(s, list):
-			output = []
-			for i in s: output.append(super().format(i, None, **t_formatted))
-			return output
-		return super().format(s, None, **t_formatted)
-	def get_value(self, key, args, kwargs):
-		key = key.upper()
-		return kwargs[key]
-
 class section(object):
 	def __init__(self):
 		self.name = None
@@ -312,7 +407,7 @@ class section(object):
 		self.errfile = log(logType.error)
 		self.requirements = requirements()
 		self.commands = commands()
-	def setName(self, name): self._name = str(name)
+	def setName(self, name): self._name = name
 	def setDescription(self, description):
 		if description == None: self._description = ''
 		else: self._description = str(description)
@@ -357,8 +452,8 @@ class section(object):
 	def getNotifyStrings(self):
 		output = []
 		if 'notify' in self.options:
-			output.append('on_stop() {{ echo "[`date`]: imminent SIGSTOP (received SIGUSR1)"; }}')
-			output.append('on_kill() {{ echo "[`date`]: imminent SIGKILL (received SIGUSR2)"; }}')
+			output.append('on_stop() { echo "[`date`]: imminent SIGSTOP (received SIGUSR1)"; }')
+			output.append('on_kill() { echo "[`date`]: imminent SIGKILL (received SIGUSR2)"; }')
 			output.append('trap \'on_stop\' SIGUSR1')
 			output.append('trap \'on_kill\' SIGUSR2')
 		return output
@@ -374,21 +469,14 @@ class section(object):
 		output.append('echo "[`date`]: section {} started"'.format(self.name))
 		output.extend(self.commands.strings)
 		output.append('echo "[`date`]: section {} completed"'.format(self.name))
+		output = [i.replace('{%SNAME%}', self.name) for i in output] # Replace SNAME token with real name
 		return output
 	def getMissingTokens(self, tokens): return self.getRequiredTokens().difference(set(tokens.keys()))
 	def getRequiredTokens(self):
 		output = tokenFormatter.extractTokens(self.strings)
-		try:
-			output.remove('%SNAME%')
+		try: output.remove('%SNAME%')
 		except: pass
 		return output
-	def format(self, tokens):
-		if self.name == None: raise ValueError('missing section name')
-		if 'l h_rt' not in self.limits: raise ValueError('missing time limit')
-		if len(self.getMissingTokens(tokens)) > 0: raise KeyError('missing tokens')
-		tokens['%SNAME%'] = self.name
-		f = tokenFormatter()
-		return f.format(self.strings, tokens)
 	name = property(getName, setName)
 	description = property(getDescription, setDescription)
 	options = property(getOptions, setOptions)
@@ -439,101 +527,156 @@ def parseTemplate(data):
 		__section__.commands.add(cmd=cmd, name=name, test=test, log=log)
 	__section__ = section()
 	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'output':qsub_default_outputs, 'command':qsub_command})
+	# Update the status of the log taskarray value:
+	if 't' in __section__.options.switches:
+		__section__.outfile.taskarray = True
+		__section__.errfile.taskarray = True
 	return __section__
 
+########################################################################################################################
+# Section File:
+
+class SectionFile(object):
+	def __init__(self, filename):
+		self.filename = filename
+		self.read()
+	def getFilename(self): return self._filename
+	def setFilename(self, filename):
+		self._filename = str(filename)
+		self.read()
+	def getInputData(self): return self._input
+	def isLocal(self):
+		filename_parsed = urlparse(self._filename)
+		if filename_parsed.netloc == '': return True
+		return False
+	def read(self):
+		if self.local == True:
+			file_handle = open(self._filename, 'rt')
+			self._input = file_handle.read()
+		else:
+			file_handle = urlopen(self._filename)
+			self._input = file_handle.read().decode('ASCII')
+		file_handle.close()
+	def getNecessaryTokens(self): return tokenFormatter.extractTokens(self.inputData)
+	def format(self, tokens): return tokens.format(self._input)
+	def parse(self, tokens):
+		tokens.update() # Update the tokens before parsing the template
+		section = parseTemplate(self.format(tokens))
+		return section
+	filename = property(getFilename, setFilename)
+	local = property(isLocal, None)
+	inputData = property(getInputData, None)
+	tokens = property(getNecessaryTokens, None)
+
+########################################################################################################################
+# Executable code:
+
+# Check we're at least at version 3.3.0 (required for the string formatting functions):
+if (sys.hexversion < 0x03030000):
+	print('ERROR: this script requires at least python 3.3')
+	sys.exit(1)
+
+# Set up the command line arguments & parse them:
+parser = argparse.ArgumentParser(description = 'Expand QSUB section templates', fromfile_prefix_chars='@')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-w', '--debug', dest='debug', action='store_true', default=False, help='show extended Python debugging information')
+parser.add_argument('-e', '--executable', dest='qsub_exec', default='qsub', help='remote qsub executable')
+parser.add_argument('-i', '--iterate', dest='iterated_tokens', action='append', help='comma-separaed list or file of iterated values for token')
+action_group = parser.add_mutually_exclusive_group(required=False)
+action_group.add_argument('-d', '--description', dest='show_description', action='store_true', default=False, help='show QSUB template description and exit')
+action_group.add_argument('-t', '--tokens', dest='show_tokens', action='store_true', default=False, help='show QSUB template tokens and exit')
+action_group.add_argument('-n', '--number', dest='show_number', action='store_true', default=False, help='show the number of processed jobs and exit')
+action_group.add_argument('-c', '--show-code', dest='show_code', action='store_true', default=False, help='print parsed QSUB section generator code and exit')
+action_group.add_argument('-s', '--submit', dest='submit', action='store_true', default=False, help='submit processed jobs to qsub')
+parser.add_argument(dest='filename', metavar='<filename>', help='QSUB template file (or URL)')
+args = parser.parse_known_args()
+unknown_args = args[1]
+args = args[0]
+
+# Define the error function:
+def error(msg):
+	if args.debug == True: raise
+	sys.stderr.write('ERROR: {}\n'.format(msg))
+	sys.exit(1)
+
 # Load the section file:
-try:
-	section_file_parsed = urlparse(args.filename)
-	if section_file_parsed.netloc == '':
-		# The file is local:
-		section_file = open(args.filename, 'rt')
-		section_data = section_file.read()
-		section_file.close()
-	else:
-		# The file is a remote URL:
-		section_file = urlopen(args.filename)
-		section_data = section_file.read().decode('ASCII')
-		section_file.close()
+try: inputFile = SectionFile(args.filename)
 except: error('failed to read section from file "{}"'.format(args.filename))
 
-# Parse the section data:
-section = parseTemplate(section_data)
-
-# Update the status of the log taskarray value:
-if 't' in section.options.switches:
-	section.outfile.taskarray = True
-	section.errfile.taskarray = True
-
-# If requested, show the generated qsub description:
-if args.show_description == True:
-	print(section.description)
-	exit(0)
-
-# If requested, show the required tokens:
+# If required, print the tokens required by the script and exit:
 if args.show_tokens == True:
-	print('\n'.join(sorted(section.tokens)))
+	print('\n'.join(sorted(inputFile.tokens)))
 	exit(0)
 
-# If requested, show the generated qsub code:
-if args.show_code == True:
-	print('\n'.join(section.qsubstrings))
-	exit(0)
-
-# Parse the token values from the command line:
-tokens = {}
+# Load and process the tokens:
+tokens = tokenSet()
 for arg in unknown_args:
-	arg_parts = arg.split('=', 1)
-	if(len(arg_parts) != 2): error('invalid token definition "{0}"'.format(arg))
-	tokens[arg_parts[0].strip()] = [arg_parts[1].strip()]
+	try: tokens.addFromString(arg)
+	except: error('failed to process token string "{}"'.format(arg))
 if args.iterated_tokens != None:
-	for i in args.iterated_tokens:
-		match = re.match('^([^=]+)=(.*)$', i)
-		token = match.group(1)
-		values = match.group(2).split(',')
-		if(len(values) == 1):
-			try:
-				tokens[token] = []
-				token_file = open(values[0], 'rt')
-				for line in token_file.readlines():
-					line = line.strip()
-					if line == '': continue
-					if line[0] == '#': continue
-					tokens[token].append(line)
-				token_file.close()
-			except: error('failed to read tokens from file "{}"'.format(values[0]))
-		else: tokens[token] = values
-# Generate a set of token dicts:
-if len(tokens) > 0:
-	token_names, token_values = zip(*tokens.items())
-	token_sets = [dict(zip(token_names, token_value)) for token_value in itertools.product(*token_values)]
-else: token_sets = [{}]
+	try:
+		for arg in args.iterated_tokens: tokens.addIteratedFromString(arg)
+	except: error('failed to process iterated token string "{}"'.format(arg))
+try: tokens.update()
+except CyclicTokenDependencyError as err: error('specified tokens have cyclic dependencies')
+except MissingTokenError as err: error('specified tokens have missing dependencies: "{}"'.format(', '.join(err.tokens)))
+except: error('failed to update tokens')
 
-# Check that the section necessary data:
-if section.name == None: error('section name is undefined')
+# Process the input file to generate a section objects:
+section_data = []
+try:
+	for i in range(len(tokens)):
+		section = inputFile.parse(tokens[i])
+		if section.name == None: raise MissingSectionNameError()
+		section_data.append(section)
+except MissingTokenError as err: error('missing required tokens: "{}"'.format(', '.join(err.tokens)))
+except MissingSectionNameError: error('section name is undefined')
+except MissingSectionTimeLimitError: error('missing section time limit')
+except: error('failed to generate qsub data')
 
-# Check that all of the tokens are present:
-missing_tokens = section.getMissingTokens(token_sets[0])
-if len(missing_tokens) != 0: error('missing tokens ({0})'.format(', '.join(sorted(missing_tokens))))
+# Get a padded string to hold the section names:
+section_header_str = '[{{:{0}}}/{{:{0}}}]: {{}}'.format(len(str(len(tokens))))
 
-# If requested, submit the job to qsub, otherwise just print it out:
+# If required, print section description(s) and exit:
+if args.show_description == True:
+	if len(section_data) == 1: print(section_data[0].description)
+	else:
+		for i in range(len(section_data)):
+			print('{} "{}"'.format(section_header_str.format(i+1, len(section_data), section_data[i].name), section_data[i].description))
+	exit(0)
+
+if args.show_number == True:
+	print(len(tokens))
+	exit(0)
+
+# If requested, show the generated qsub code and exit:
+if args.show_code == True:
+	if len(section_data) == 1: print('\n'.join(section_data[0].qsubstrings))
+	else:
+		for i in range(len(section_data)):
+			print(section_header_str.format(i+1, len(section_data), section_data[i].name))
+			print('\n'.join(section_data[i].qsubstrings))
+			if i < (len(section_data) - 1): print('\n')
+	exit(0)
+
+# If requested, Submit the scripts:
 if args.submit == True:
-	for token_set in token_sets:
-		output_data = '\n'.join(section.format(token_set))		
+	for i in range(len(section_data)):
 		try: qsub_process = subprocess.Popen(args=[args.qsub_exec], stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
 		except: error('failed to spawn subprocess "{}"'.format(args.qsub_exec))
 		try:
-			output_data = qsub_process.communicate(input='\n'.join(section.format(token_set)))
+			output_data = qsub_process.communicate(input='\n'.join(section_data[i].strings))
 			print(output_data[0].strip())
 		except:
 			qsub_process.kill()
 			qsub_process.communicate()
 			error('failed to submit job to subprocess "{}"'.format(args.qsub_exec))
+	exit(0)
+
+# Print out the complete code:
+if len(section_data) == 1:
+	print('\n'.join(section_data[0].strings))
 else:
-	if len(token_sets) > 1:
-		for token_set in token_sets:
-			output = []
-			for t in sorted(section.getRequiredTokens()): output.append('{}="{}"'.format(t, token_set[t]))
-			f = tokenFormatter()
-			section_name = f.format(section.name, token_set)
-			print('{}: {}'.format(section_name, ', '.join(output)))
-	else: print('\n'.join(section.format(token_sets[0])))
+	for i in range(len(section_data)):
+		print('{} ({})'.format(section_header_str.format(i+1, len(section_data), section_data[i].name), tokens[i].valueString()))
+exit(0)
