@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 # Set the script version number:
-version = '2.6 (2016-06-01)'
+version = '2.6b (2016-06-14)'
 
 ########################################################################################################################
 # Tokens:
@@ -526,7 +526,7 @@ def parseTemplate(data):
 	def qsub_command(cmd, name=None, test=True, log=True):
 		__section__.commands.add(cmd=cmd, name=name, test=test, log=log)
 	__section__ = section()
-	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'output':qsub_default_outputs, 'command':qsub_command})
+	exec(data, {'section':qsub_section, 'limits':qsub_limits, 'option':qsub_option, 'options':qsub_options, 'hold':qsub_hold, 'require':qsub_require, 'output':qsub_outfile, 'error':qsub_errfile, 'outputs':qsub_default_outputs, 'command':qsub_command})
 	# Update the status of the log taskarray value:
 	if 't' in __section__.options.switches:
 		__section__.outfile.taskarray = True
