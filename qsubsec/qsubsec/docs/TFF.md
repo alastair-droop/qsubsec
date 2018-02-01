@@ -1,61 +1,100 @@
-# Token File Format (TFF)
+# Token File Format (TFF) Syntax
 
-TFF files describe the tokens used to process a qsubsec file.
+Token Files define the placeholder tokens used to generate qsubsec templates. The `qsubsec` script fills in the values of the tokens at submission time, yielding complete scripts for submission. The Token File Format (`TFF`) is a small language used to define a set of tokens.
 
-# Basic Token Definition
+## Basic Syntax
 
-Tokens are defined using the follwoing syntax:
+A TFF `file` contains at most one instruction per line. All whitespace at the beginning and end of a line is removed. Empty lines are ignored. Names and values can be quoted (with either single or double quotes, but start and end quotes must match). Unquoted names and values can only contain letters, numbers and the characters `.`, `-`, `_`, `{`, `}`, `/`, & `:`. Quoted names and values can contain any valid character.
 
-~~~
-TOKEN = VALUE
-~~~
+### Comments
 
-If necessary, both the token name and value can be quoted (with either single or double quotes):
+TFF files can contain comments. Comments are started using the hash sign (`#`). Any text after the comment sign is ignored. There is no support for multi-line comments.
 
-~~~
-"TOKEN1" = "VALUE"
-'TOKEN2' = "VALUE"
-~~~
+### Token Assignment
 
-If unquoted, token names and values must contain only letters, numbers and underscores. Quoted names and values can contain any printable characters.
-
-Any token name or value can contain a placeholder as long as the placeholder resolves to a valid token name by the time it is processed. For example, the following is valid:
+A simple token assignment takes the form:
 
 ~~~
-KEY=A
-"TOKEN_{KEY}"="Hello"
+NAME = VALUE
 ~~~
 
-This will result in two tokens: `KEY`="A", and `TOKEN_A`="Hello". However, if the token `KEY` is not defined before it is needed, the assignment will fail:
+This statement will create a token with the name `NAME` and the value `VALUE`.
+
+### Iterated Tokens
+
+Tokens can be assigned multiple values (called *iterated tokens*). This is done by providing a comma-separated list of values instead of a single value:
 
 ~~~
-# Invalid:
-"TOKEN_{KEY}"="Hello"
-KEY=A
+NAME = VALUE1, VALUE2
 ~~~
 
-# Multiple Token Values
+This statement will create a single token (`NAME`) with two values (`VALUE1` and `VALUE2`).
 
-Tokens with multipole values can be defined as:
+### Token Placeholders
 
-~~~
-TOKEN = VALUE1, VALUE2, VALUE3
-~~~
-
-As above quotes are optional.
-
-# Including other TFF files
-
-A new TFF file can be included using the `IMPORT` statement:
+Tokens placeholders are used to specify where the value of a token is to be filled in. Token placeholders are specified using the token name in parentheses (for example `{NAME}`). Placeholders can be used in all name and value fields in a TFF file. For example, a token name can be created using a placeholder, as can token values:
 
 ~~~
-IMPORT("file.tff")
+PERSON = Alice
+GREETING = "Good morning"
+GREET_{PERSON} = "{GREETING}, {PERSON}!"
 ~~~
 
-The new TFF file will be processed and included into the current document.
+In the above code, three tokens are created: `PERSON`, `GREETING`, and `GREET_Alice`. If a token name contains a placeholder referring to an iterated token (or tokens), a new token is created **for each** combination of token values. Iterated tokens referred to in token values will yield multiple values for the token, rather than duplicating the token definition.
 
-# Importing Token Values from File
+## Importing TFF Files
 
-Token values can be read from file or URL in two forms: normal or simple. In normal mode, comment characters and empty lines are stripped
+The entire contents of a secondary TFF file can be imported using the `IMPORT` function:
 
+~~~
+# file_1.tff
+A=1
+IMPORT(file_2.tff)
+~~~
 
+~~~
+# file_2.tff:
+A="new value"
+B=2
+C=3
+~~~
+
+After processing `file_1.tff`, three tokens will be present: `A`, `B`, and `C`. Furthermore, the value of token A will have been updated as it has been redefined. File names can contain token placeholders.
+
+## Deleting Tokens
+
+If a token is loaded and is no longer needed, it can be removed using the `REMOVE` function:
+
+~~~
+A=1
+REMOVE(A)
+~~~
+
+## Loading Token Values from File
+
+Token values can be assigned form file. This is especially useful where large numbers of values are possible. Two possible methods exist for this: *normal* and *simple*. If a file is loaded normally, it is processed before loading:
+
+* Empty lines are ignored
+* Comments are ignored
+* **NB:** quotes are **not** stripped from values before loading
+
+Files loaded as simple are not processed, so empty and comments will be included in the output token values.
+
+The function `FILE` reads data from a file normally, and the function `SFILE` loads data simply. For example:
+
+~~~
+# names.txt:
+Alice
+Bob
+Charlie
+~~~
+
+~~~
+NAME = FILE(names.txt)
+~~~
+
+The above TFF file generates a single token (`NAME`) containing the three names `Alice`, `Bob` & `Charlie`.
+
+The `URL` and `SURL` functions perform identically to `FILE` and `SFILE` but load data from a URL rather than a local file. Both file names and URLs can contain tokens. Each loading function replaces the value fo the token, so if files or URLs contain placeholders referring to iterated tokens, only the contents of the last resolved location will be used.
+
+**NB:** File and URL data are loaded as ASCII text.
