@@ -108,7 +108,6 @@ class Token(object):
     """This class encapsulates a token which can take one or more values"""
     @classmethod
     def fromFile(cls, name, filename, simple=False):
-        # output = Token(name=name, values=[])
         values = []
         with open(filename, 'rt') as file_handle:
             for line in file_handle.readlines():
@@ -179,7 +178,7 @@ class TokenSet(object):
         """Add a single Token to the TokenSet"""
         assert(isinstance(token, Token))
         if token.name in self.names:
-            log.info('redefining existing token {} ("{}" -> "{}")'.format(token.name, '", "'.join([str(i) for i in self.tokens[token.name].values]), '", "'.join([str(i) for i in token.values])))
+            log.debug('redefining existing token {} ("{}" -> "{}")'.format(token.name, '", "'.join([str(i) for i in self.tokens[token.name].values]), '", "'.join([str(i) for i in token.values])))
         self._tokens[token.name] = token
         log.debug('added token {}'.format(token.asText()))
     def extend(self, token_set):
@@ -368,8 +367,8 @@ class TFFParser(object):
         equals = Suppress(Literal('='))
         open_parenthesis = Suppress(Literal('('))
         close_parenthesis = Suppress(Literal(')'))
-        function_keyword = oneOf(['FILE', 'SFILE', 'URL'], caseless=True)
-        import_keyword = oneOf(['IMPORT'], caseless=True)
+        function_keyword = oneOf(['FILE', 'SFILE', 'URL', 'SURL'], caseless=True)
+        mod_keyword = oneOf(['IMPORT', 'REMOVE'], caseless=True)
         name = Word(kw_chars) ^ QuotedString('"') ^ QuotedString('\'')
         fname = Word(fn_chars) ^ QuotedString('"') ^ QuotedString('\'').setResultsName('filename')
         value = Word(kw_chars) ^ QuotedString('"') ^ QuotedString('\'')
@@ -377,10 +376,10 @@ class TFFParser(object):
         comment = Suppress(pythonStyleComment())
         empty_line = Optional(comment) + Suppress(LineEnd())
         assignment = Group(name.setResultsName('token') + equals + values.setResultsName('token_values')).setResultsName('assignment')
-        function_field = function_keyword.setResultsName('func') + open_parenthesis + fname.setResultsName('filename') + close_parenthesis
+        function_field = function_keyword.setResultsName('func') + open_parenthesis + fname.setResultsName('argument') + close_parenthesis
         function_assignment = Group(name.setResultsName('token') + equals + function_field).setResultsName('func_assignment')
-        import_statement = Group(import_keyword + open_parenthesis + fname.setResultsName('filename') + close_parenthesis).setResultsName('import')
-        statement = assignment ^ function_assignment ^ import_statement + Optional(comment) ^ Suppress(LineEnd())
+        mod_statement = Group(mod_keyword.setResultsName('func') + open_parenthesis + fname.setResultsName('argument') + close_parenthesis).setResultsName('mod')
+        statement = assignment ^ function_assignment ^ mod_statement + Optional(comment) ^ Suppress(LineEnd())
         self._parser = ZeroOrMore(empty_line ^ statement)
     def getParser(self): return self._parser
     def getRecursionLimit(self): return self._recursion_limit
@@ -394,27 +393,41 @@ class TFFParser(object):
         # Update the output token set:
         for s in file_data:
             if s.getName() is 'assignment':
-                output_ts.add(Token(s.token, s.token_values))
+                for resolved_name in output_ts.resolveString(s.token):
+                    new_token = Token(resolved_name, s.token_values)
+                    log.info('adding token  {}'.format(new_token.asText()))
+                    output_ts.add(new_token)
             elif s.getName() is 'func_assignment':
                 if s.func is 'FILE':
-                    for resolved_filename in output_ts.resolveString(s.filename):
+                    for resolved_filename in output_ts.resolveString(s.argument):
                         log.info('reading data from file "{}"'.format(resolved_filename))
                         output_ts.add(Token.fromFile(s.token, resolved_filename, simple=False))
                 elif s.func is 'SFILE':
-                    for resolved_filename in output_ts.resolveString(s.filename):
-                        log.info('reading data from simple file "{}"'.format(resolved_filename))
+                    for resolved_filename in output_ts.resolveString(s.argument):
+                        log.info('reading simple data from file "{}"'.format(resolved_filename))
                         output_ts.add(Token.fromFile(s.token, resolved_filename, simple=True))
                 elif s.func is 'URL':
-                    for resolved_url in output_ts.resolveString(s.filename):
+                    for resolved_url in output_ts.resolveString(s.argument):
                         log.info('reading data from from URL "{}"'.format(resolved_url))
-                        output_ts.add(Token.fromURL(s.token, resolved_url))
+                        output_ts.add(Token.fromURL(s.token, resolved_url, simple=False))
+                elif s.func is 'SURL':
+                    for resolved_url in output_ts.resolveString(s.argument):
+                        log.info('reading simple data from from URL "{}"'.format(resolved_url))
+                        output_ts.add(Token.fromURL(s.token, resolved_url, simple=True))
                 else: raise NotImplementedError('Assignment from function {} not implemented yet'.format(s.func))
-            elif s.getName() is 'import':
-                for resolved_filename in output_ts.resolveString(s.filename):
-                    log.info('including TFF file "{}"'.format(resolved_filename))
-                    new_data = self.parse(resolved_filename, depth=depth + 1)
-                    output_ts.extend(new_data)
-            else: raise Exception('Invalid statement type')
+            elif s.getName() is 'mod':
+                if s.func is 'IMPORT':
+                    for resolved_filename in output_ts.resolveString(s.filename):
+                        log.info('including TFF file "{}"'.format(resolved_filename))
+                        new_data = self.parse(resolved_filename, depth=depth + 1)
+                        output_ts.extend(new_data)
+                elif s.func is 'REMOVE':
+                    for resolved_name in output_ts.resolveString(s.argument):
+                        if resolved_name in output_ts:
+                            log.info('removing token {}'.format(output_ts[resolved_name].asText()))
+                            del output_ts[resolved_name]
+                        else: log.debug('removing token "{}" failed: token not present'.format(resolved_name))
+            else: raise NotImplementedError('Modifier function {} not implemented'.format(s.func))
         return output_ts
     recursionLimit = property(getRecursionLimit, setRecursionLimit, "The maximum permissibe recursion limit")
     parser = property(getParser, None, "The TFF DSL parser object")
