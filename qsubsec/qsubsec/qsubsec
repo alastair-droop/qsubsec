@@ -59,7 +59,8 @@ for t in args.tokens:
         log.info('reading tokens from command line "{}"'.format(t))
         ts_new = tsp.parseString(t)
     ts.extend(ts_new)
-        
+
+print(ts.asTFF())
 # Execute the file:
 template.execute(ts)
 # print(template.sections.asJSON(indent='\t'))
