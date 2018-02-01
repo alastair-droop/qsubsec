@@ -1,0 +1,4 @@
+# Some kinds of days
+good
+nice
+happy

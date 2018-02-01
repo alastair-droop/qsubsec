@@ -1,0 +1,4 @@
+# This is a simple token definition file in TFF format
+# Alastair Droop, 2018-01-12
+
+MESSAGE="Have a {KIND} day."

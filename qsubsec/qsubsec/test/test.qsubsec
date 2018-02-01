@@ -1,0 +1,17 @@
+section('{PROJECT}-ALIGN-PASS1-{SAMPLE}', description='Runs pass 1 of STAR alignment.')
+limits(time='36:00:00', nodes=1)
+options(['V', 'cwd', 'notify'])
+outputs('{LOG_DIR}')
+
+# Make sure the inputs are present:
+require('TMPDIR', 'env_set')
+require('{STAR_REF_DIR}', 'path_readable')
+for pair in ['1', '2']:
+    hold('{PROJECT}-MERGE-{SAMPLE}_%s' % pair)
+    require ('{FASTQ_DIR}/{SAMPLE}_%s-trimmed.fastq.gz' % pair, 'path_readable')
+
+# Create the output directory, if not already present:
+command('mkdir -p {ALIGNED_DIR}/pass-1/{SAMPLE}', name='make_output', log=True, test=True)
+
+# The first pass alignment command:
+command('{STAR_EXEC} --runMode alignReads --outTmpDir $TMPDIR/STAR-align --runThreadN {STAR_MAP_NTHREADS} --outSAMtype BAM SortedByCoordinate --genomeDir {STAR_REF_DIR} --readFilesCommand zcat --readFilesIn {FASTQ_DIR}/{SAMPLE}_1-trimmed.fastq.gz {FASTQ_DIR}/{SAMPLE}_2-trimmed.fastq.gz --outFileNamePrefix {ALIGNED_DIR}/pass-1/{SAMPLE}/{SAMPLE}-', name='align-pass1-%s' % '{SAMPLE}', log=True, test=True)

@@ -1,0 +1,8 @@
+# This is a simple token definition file in TFF format
+# Alastair Droop, 2017-08-18
+
+NAME = "Alice", "Bob"
+GREETING="Hello", "Goodbye"
+A=1
+IMPORT(test2.tff)
+IMPORT(test3.tff)

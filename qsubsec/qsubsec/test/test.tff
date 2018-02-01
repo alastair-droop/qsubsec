@@ -1,0 +1,5 @@
+NAME = "Bob", "Alice"
+GREETING = "Hello", "Goodbye"
+MESSAGE = "Have a {KIND} day."
+KIND_FILE = "day-kinds.txt"
+KIND = FILE({KIND_FILE})

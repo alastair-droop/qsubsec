@@ -1,0 +1,3 @@
+KIND_FILE=day-kinds.txt
+KIND=FILE({KIND_FILE})
+A=3
