@@ -4,7 +4,7 @@ import tokens as qstokens
 import os.path
 import logging
 import argparse
-from sys import exit
+from sys import exit, stdin
 
 version = '0.1a (2018-01-12)'
 
@@ -18,7 +18,7 @@ output_types.add_argument('-q', '--quiet', dest='quiet', action='store_true', de
 output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
 output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
 output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
-parser.add_argument(metavar='file', dest='input_files', nargs='+', help='input TFF file(s) to parse')
+parser.add_argument(metavar='file', dest='input_files', nargs='*', default=['-'], help='input TFF file(s) to parse')
 args = parser.parse_args()
 
 # A function to quit with an error:
@@ -46,8 +46,13 @@ ts = qstokens.TokenSet()
 
 # Run through each input file in turn:
 for f in args.input_files:
-    f_path = os.path.realpath(f)
-    log.info('processing input file {}'.format(f_path))
+    if f == '-':
+        # Read from stdin:
+        f_path = stdin
+        log.info('processing stdin')
+    else:
+        f_path = os.path.realpath(f)
+        log.info('processing input file {}'.format(f_path))
     # Parse the file:
     try:
         ts_new = tsp.parse(f_path)
