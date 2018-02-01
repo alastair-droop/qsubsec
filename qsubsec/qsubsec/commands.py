@@ -53,28 +53,3 @@ class CommandList(object):
     def __iter__(self): return iter(self.commands)
     commands = property(getCommands, setCommands, "The commands in the list")
     json = property(asJSON, None, "The command list in JSON format")
-    
-
-    # def __init__(self):
-    #     self.sections = []
-    # def append(self, section):
-    #     if not isinstance(section, Section): raise ValueError('invalid section type')
-    #     self._sections.append(section)
-    # def getSections(self): return self._sections
-    # def getLatestSection(self): return self._sections[-1]
-    # def setSections(self, sections=[]):
-    #     self._sections = []
-    #     for sections in sections: self.append(section)
-    # def newSection(self, name, description=None):
-    #     new = Section(name=name, description=description)
-    #     self.append(new)
-    # def __len__(self): return len(self.sections)
-    # def __getitem__(self, key): return self.sections[key]
-    # def __delitem__(self, key): del(self.sections[key])
-    # def __iter__(self): return iter(self.sections)
-    # def asJSON(self, indent=None):
-    #     output = [s.asDict() for s in self.sections]
-    #     return json.dumps(output, sort_keys=False, indent=indent)
-    # json = property(asJSON, None, "JSON representation of the section list")
-    # sections = property(getSections, setSections, "Return the section list")
-    # latest = property(getLatestSection, None, "Return the last section added")

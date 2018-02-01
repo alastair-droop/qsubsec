@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+import tokens as qstokens
+import templates as qstemplates
+import os.path
+import logging
+import argparse
+from sys import exit, stdin
+
+version = '3.0a (2018-02-01)'
+
+# Create the command line interface:
+parser = argparse.ArgumentParser(description='Expand QSUB section templates')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
+
+# parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default='TFF', help='output format for single resolved token sets')
+# output_types = parser.add_mutually_exclusive_group(required=False)
+# output_types.add_argument('-q', '--quiet', dest='quiet', action='store_true', default=False, help='do not print output')
+# output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
+# output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
+# output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
+parser.add_argument(metavar='template', dest='template_file', help='template file to process')
+parser.add_argument(dest='tokens', nargs='*', default='-', help='Token definitions')
+args = parser.parse_args()
+
+# A function to quit with an error:
+def error(msg, exit_code=1):
+    log.error(msg)
+    exit(exit_code)
+
+# Set up logging based on the verbosity level set by the command line arguments:
+log = logging.getLogger()
+log_handler = logging.StreamHandler()
+log.default_msec_format = ''
+log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+log.setLevel(args.verbosity_level.upper())
+log.addHandler(log_handler)
+
+# Load the tokens:
+tsp = qstokens.TFFParser()
+ts = qstokens.TokenSet()
+
+# Load the template file:
+log.info('reading template from file "{}"'.format(args.template_file))
+template = qstemplates.Template.fromFile(args.template_file)
+
+# Run through each token input turn:
+for t in args.tokens:
+    if t == '-':
+        # Read from stdin:
+        log.info('reading tokens from stdin')
+        ts_new = tsp.parseHandle(stdin)
+    elif os.path.exists(t):
+        f_path = os.path.realpath(t)
+        log.info('reading tokens from file {}'.format(f_path))
+        ts_new = tsp.parse(f_path)
+    else:
+        log.info('reading tokens from command line "{}"'.format(t))
+        ts_new = tsp.parseString(t)
+    ts.extend(ts_new)
+        
+# Execute the file:
+template.execute(ts)
+# print(template.sections.asJSON(indent='\t'))

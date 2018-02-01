@@ -60,12 +60,3 @@ class Template(object):
     formatter = property(getFormatter, setFormatter, "Formatter used for parsing tokens")
     sections = property(getSections, None, "The template sections")
     string = property(getString, setString, "The template string")
-
-ts = qstokens.TFFParser().parse('test/test.tff')
-# t = Template('section("TEST_{NAME}")')
-t = Template.fromFile('test/test.qsubsec')
-t.execute(ts)
-# print(t.sections[0].limits.json)
-#
-print(t.sections.asJSON(indent='\t'))
-#

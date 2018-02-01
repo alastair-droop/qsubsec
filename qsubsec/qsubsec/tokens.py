@@ -387,9 +387,20 @@ class TFFParser(object):
     def parse(self, filename, depth=0):
         """Parse a TFF file to yield a TokenSet"""
         log.debug('parsing TFF file "{}"'.format(filename))
+        with open(filename, 'rt') as input_file:
+            input_string = input_file.read()
+        return self.parseString(input_string, depth=0)
+    def parseHandle(self, file_handle, depth=0):
+        """Parse a TFF file to yield a TokenSet"""
+        log.debug('parsing TFF file handle')
+        input_string = file_handle.read()
+        return self.parseString(input_string, depth=0)
+    def parseString(self, input_string, depth=0):
+        """Parse a TFF string to yield a TokenSet"""
+        log.debug('parsing TFF from string')
         output_ts = TokenSet()
         # Open and parse the file:
-        file_data = self.parser.parseFile(filename, parseAll=True)
+        file_data = self.parser.parseString(input_string, parseAll=True)
         # Update the output token set:
         for s in file_data:
             if s.getName() is 'assignment':
