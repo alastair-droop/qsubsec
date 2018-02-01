@@ -428,7 +428,7 @@ class TFFParser(object):
                 else: raise NotImplementedError('Assignment from function {} not implemented yet'.format(s.func))
             elif s.getName() is 'mod':
                 if s.func is 'IMPORT':
-                    for resolved_filename in output_ts.resolveString(s.filename):
+                    for resolved_filename in output_ts.resolveString(s.argument):
                         log.info('including TFF file "{}"'.format(resolved_filename))
                         new_data = self.parse(resolved_filename, depth=depth + 1)
                         output_ts.extend(new_data)
