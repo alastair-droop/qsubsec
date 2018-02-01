@@ -22,14 +22,13 @@ class Template(object):
     def execute(self, tokens):
         def QSBSection(name, description=None):
             self.sections.newSection(name, description=description)
-        
         for formatted_data in self.format(tokens):
             exec(formatted_data, {'section':QSBSection})
     formatter = property(getFormatter, setFormatter, "Formatter used for parsing tokens")
     sections = property(getSections, None, "The template sections")
     string = property(getString, setString, "The template string")
 
-ts = qstokens.TFFParser().parse('test.tff')
+ts = qstokens.TFFParser().parse('test/test.tff')
 t = Template('section("TEST_{NAME}")')
 # t = Template('print("Hello, {NAME}.")')
 t.execute(ts)
