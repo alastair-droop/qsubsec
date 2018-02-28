@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import tokens as qstokens
+import tokens
 import os.path
 import logging
 import argparse
@@ -18,6 +18,7 @@ output_types.add_argument('-q', '--quiet', dest='quiet', action='store_true', de
 output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
 output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
 output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
+output_types.add_argument('-s', '--parse-string', dest='parse_string', default=None, help='parse a specific string')
 parser.add_argument(metavar='file', dest='input_files', nargs='*', default=['-'], help='input TFF file(s) to parse')
 args = parser.parse_args()
 
@@ -41,8 +42,8 @@ log.setLevel(args.verbosity_level.upper())
 log.addHandler(log_handler)
 
 # Initialise the TFF parser:
-tsp = qstokens.TFFParser()
-ts = qstokens.TokenSet()
+tsp = tokens.TFFParser()
+ts = tokens.TokenSet()
 
 # Run through each input file in turn:
 for f in args.input_files:
@@ -57,24 +58,37 @@ for f in args.input_files:
     try:
         ts_new = tsp.parse(f_path)
         ts.extend(ts_new)
-    except qstokens.MissingTokenError as err: error('missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
+    except tokens.MissingTokenError as err: error('missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
     except BaseException as err: error(str(err))
+
+# Parse a specific string, if requested:
+if args.parse_string is not None:
+    log.info('parsing string "{}"'.format(args.parse_string))
+    try:
+        for i in ts.resolveString(args.parse_string):
+            print(i)
+    except tokens.CyclicTokenDependencyError as err: error('cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
+    except tokens.MissingTokenError as err: error('missing tokens "{}"'.format('", "'.join(err.tokens)))
+    except BaseException as err: error(str(err))
+    exit(0)
 
 # Print out the dependency graph, if requested:
 if args.print_graph is True:
+    log.info('generating dependency graph')
     print(ts.asDot())
     exit(0)
 
 # Print out the complete input, if requested:
 if args.print_input is True:
+    log.info('generating input token data')
     print(longFormat(ts))
     exit(0)
 
 # Resolve the complete token set:
 log.info('resolving tokens')
 try: res = ts.resolve()
-except qstokens.CyclicTokenDependencyError as err: error('cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
-except qstokens.MissingTokenError as err: error('missing tokens "{}"'.format('", "'.join(err.tokens)))
+except tokens.CyclicTokenDependencyError as err: error('cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
+except tokens.MissingTokenError as err: error('missing tokens "{}"'.format('", "'.join(err.tokens)))
 except BaseException as err: error(str(err))
 res_n = len(res)
 

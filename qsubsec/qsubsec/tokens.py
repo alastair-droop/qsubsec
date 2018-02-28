@@ -180,7 +180,7 @@ class TokenSet(object):
         if token.name in self.names:
             log.debug('redefining existing token {} ("{}" -> "{}")'.format(token.name, '", "'.join([str(i) for i in self.tokens[token.name].values]), '", "'.join([str(i) for i in token.values])))
         self._tokens[token.name] = token
-        log.debug('added token {}'.format(token.asText()))
+        # log.debug('added token {}'.format(token.asText()))
     def extend(self, token_set):
         """Extent the TokenSet by adding all tokens from a second TokenSet"""
         for t in token_set.tokens:
@@ -270,7 +270,7 @@ class TokenSet(object):
         """Generate a list of TokenSets each with only a single value per token"""
         # Check the TokenSet is valid:
         if self.complete is not True: raise MissingTokenError(self.getExternalDependencies())
-        if self.cyclic is True: raise CyclicTokenDependencyError(ts.getCyclicDependencyGraph()[0].keys())
+        if self.cyclic is True: raise CyclicTokenDependencyError(set(ts.getCyclicDependencyGraph()[0].keys()))
         # Expand the token set to produce a list of non-iterated TokenSets:
         names = self.names
         values = [self[i].values for i in names]
@@ -285,7 +285,7 @@ class TokenSet(object):
         """Generate a list of non-iterated TokenSets with all dependencies resolved to their values"""
         # Check the TokenSet is valid:
         if self.complete is not True: raise MissingTokenError(self.getExternalDependencies())
-        if self.cyclic is True: raise CyclicTokenDependencyError(self.getCyclicDependencyGraph()[0].keys())
+        if self.cyclic is True: raise CyclicTokenDependencyError(set(self.getCyclicDependencyGraph()[0].keys()))
         output = []
         for tokenset in self.singularize():
             while True:
@@ -310,7 +310,10 @@ class TokenSet(object):
         n = '_STR_'
         while n in ts.names: n = '_{}'.format(n)
         ts.add(Token(n, [string]))
-        res = ts.resolveToken(n)
+        try: res = ts.resolveToken(n)
+        except CyclicTokenDependencyError as err:
+            err.tokens -= set([n])
+            raise err
         return res
     def asTFF(self):
         """Return a TFF representation of the TokenSet"""
@@ -386,18 +389,19 @@ class TFFParser(object):
     def setRecursionLimit(self, limit): self._recursion_limit = limit
     def parse(self, filename, depth=0):
         """Parse a TFF file to yield a TokenSet"""
-        log.debug('parsing TFF file "{}"'.format(filename))
+        log.info('extracting TFF string from file "{}"'.format(filename))
         with open(filename, 'rt') as input_file:
             input_string = input_file.read()
         return self.parseString(input_string, depth=0)
     def parseHandle(self, file_handle, depth=0):
         """Parse a TFF file to yield a TokenSet"""
-        log.debug('parsing TFF file handle')
+        log.info('extracting TFF string from file handle')
         input_string = file_handle.read()
         return self.parseString(input_string, depth=0)
     def parseString(self, input_string, depth=0):
         """Parse a TFF string to yield a TokenSet"""
-        log.debug('parsing TFF from string')
+        log.info('parsing TFF string')        
+        log.debug('TFF string:\n{}'.format(input_string))
         output_ts = TokenSet()
         # Open and parse the file:
         file_data = self.parser.parseString(input_string, parseAll=True)
@@ -406,7 +410,7 @@ class TFFParser(object):
             if s.getName() is 'assignment':
                 for resolved_name in output_ts.resolveString(s.token):
                     new_token = Token(resolved_name, s.token_values)
-                    log.info('adding token  {}'.format(new_token.asText()))
+                    log.info('assigning token  {}'.format(new_token.asText()))
                     output_ts.add(new_token)
             elif s.getName() is 'func_assignment':
                 if s.func is 'FILE':
@@ -437,7 +441,7 @@ class TFFParser(object):
                         if resolved_name in output_ts:
                             log.info('removing token {}'.format(output_ts[resolved_name].asText()))
                             del output_ts[resolved_name]
-                        else: log.debug('removing token "{}" failed: token not present'.format(resolved_name))
+                        else: log.info('removing token "{}" failed: token not present'.format(resolved_name))
             else: raise NotImplementedError('Modifier function {} not implemented'.format(s.func))
         return output_ts
     recursionLimit = property(getRecursionLimit, setRecursionLimit, "The maximum permissibe recursion limit")
