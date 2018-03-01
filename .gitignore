@@ -1,2 +1,5 @@
 archive
 __pycache__
+qsubsec.egg-info
+build
+dist
