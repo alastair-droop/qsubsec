@@ -1,0 +1,3 @@
+section('PRINT_{VARIABLE}', 'Outputs the value of the {VARIABLE} environment variable to log', check=False, log=False)
+limits(time='00:00:10', vmem='10M')
+message('{VARIABLE} is "${VARIABLE}"')
