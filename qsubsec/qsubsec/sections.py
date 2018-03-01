@@ -68,6 +68,12 @@ class Log(object):
     def getFilename(self, sectionID, taskarray=False):
         if self.name is not None: return os.path.join(self.path, self.name)
         return os.path.join(self.path, self.getDefaultFilename(sectionID, taskarray))
+    def asDict(self):
+        output = OrderedDict()
+        output['logtype'] = self.logtype.name
+        output['path'] = self.path
+        output['name'] = self.name
+        return output
     logtype = property(getLogtype, setLogtype, "The log file type")
     path = property(getPath, setPath, "The log file path")
     name = property(getName, setName, "The log file name")

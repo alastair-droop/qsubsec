@@ -39,3 +39,24 @@ If `log` is `True`, section start and completion logs are written.
 ### error
 
 ### __sections__
+
+## Example 1
+
+The following section script writes the value of the PATH variable to its output log file.
+
+~~~python
+section('PRINT_PATH', 'Outputs the value of the PATH environment variable to log')
+limits(time='00:00:10', vmem='10M')
+message('PATH is "$PATH"')
+~~~
+
+## Example 2
+
+The following script generalises example 1 to use a token to specify the environment variable to show.
+
+~~~python
+section('PRINT_{VARIABLE}', 'Outputs the value of the {VARIABLE} environment variable to log', check=False, log=False)
+limits(time='00:00:10', vmem='10M')
+message('{VARIABLE} is "${VARIABLE}"')
+~~~
+

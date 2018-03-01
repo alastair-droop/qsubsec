@@ -9,7 +9,7 @@ from sys import exit, stdin
 version = '0.1a (2018-01-12)'
 
 # Create the command line interface:
-parser = argparse.ArgumentParser(description='Parse qsubsec token files')
+parser = argparse.ArgumentParser(description='Parse qsubsec token TFF files')
 parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
 parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
 parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default='TFF', help='output format for single resolved token sets')

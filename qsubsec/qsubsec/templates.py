@@ -62,7 +62,7 @@ class Template(object):
             self.sections.latest.commands.newCommand(cmd=message, name=None, test=False, log=False, cmdtype=CommandType.log_err)
         for formatted_data in self.format(tokens):
             log.info('executing formatted template')
-            exec(formatted_data, {'__sections__':self.sections, 'section':QSBSection, 'limits':QSBLimits, 'options':QSBOptions, 'hold':QSBHold, 'require':QSBRequire, 'outputFile':QSBOutfile, 'errorFile':QSBErrfile, 'outputs':QSBOutputs, 'command':QSBCommand, 'message':QSBLogOutput, 'error':QSBLogError})
+            exec(formatted_data, {'__sections__':self.sections, '__tokens__':tokens, 'section':QSBSection, 'limits':QSBLimits, 'options':QSBOptions, 'hold':QSBHold, 'require':QSBRequire, 'outputFile':QSBOutfile, 'errorFile':QSBErrfile, 'outputs':QSBOutputs, 'command':QSBCommand, 'message':QSBLogOutput, 'error':QSBLogError})
     formatter = property(getFormatter, setFormatter, "Formatter used for parsing tokens")
     sections = property(getSections, None, "The template sections")
     string = property(getString, setString, "The template string")

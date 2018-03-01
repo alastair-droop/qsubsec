@@ -6,6 +6,7 @@ from templates import Template
 from collections import OrderedDict
 import sectionFormatter
 import os.path
+from os import remove
 import logging
 import argparse
 import json
@@ -173,8 +174,8 @@ else:
         section_name = sections[i].name
         if args.purge_logs is True:
             sec_files = OrderedDict()
-            sec_files['output'] = section.outfile.getFilename(section_name)
-            sec_files['error'] = section.errfile.getFilename(section_name)
+            sec_files['output'] = sections[i].outfile.getFilename(section_name)
+            sec_files['error'] = sections[i].errfile.getFilename(section_name)
             for file_type in sec_files.keys():
                 try:
                     log.info('purging section {} file "{}"'.format(file_type, sec_files[file_type]))
