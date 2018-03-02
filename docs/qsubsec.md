@@ -58,12 +58,14 @@ options('V', 'cwd', 'notify')
 ### error
 
 ### __sections__
+### __tokens__
 
 ## Example 1
 
 The following section script writes the value of the PATH variable to its output log file.
 
 ~~~python
+# example-1.qsubsec
 section('PRINT_PATH', 'Outputs the value of the PATH environment variable to log')
 limits(time='00:00:10', vmem='10M')
 message('PATH is "$PATH"')
@@ -74,8 +76,10 @@ message('PATH is "$PATH"')
 The following script generalises example 1 to use a token to specify the environment variable to show.
 
 ~~~python
+# example-2.qsubsec
 section('PRINT_{VARIABLE}', 'Outputs the value of the {VARIABLE} environment variable to log', check=False, log=False)
 limits(time='00:00:10', vmem='10M')
 message('{VARIABLE} is "${VARIABLE}"')
 ~~~
+
 
