@@ -74,7 +74,6 @@ def main():
         except BaseException as err: error(str(err))
 
     # Parse a specific string, if requested:
-    print(args.parse_string)
     if args.parse_string is not None:
         log.info('parsing string "{}"'.format(args.parse_string))
         try:
