@@ -29,6 +29,10 @@ cd qsubsec3
 python setup.py install
 ~~~
 
+If you do not have admin privileges, you can install this locally using `python setup.py install --user`.
+
+After installation, you can verify that you have the correct version using `qsubsec -v`.
+
 Although `qsubsec` can be run on most machines, the qsub executable must be available and functional for automatic qsub submission to work (using the `-s` argument with the qsub format).
 
 ## Licence
