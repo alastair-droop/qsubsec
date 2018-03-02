@@ -17,18 +17,37 @@ Tokens placeholders are used to specify where the value of a token is to be fill
 
 ## Section File Format
 
-After token replacement, section files are executed as Python code. However, several extra builtin functions are present. These are outlined below
+After token replacement, section files are executed as Python code. However, several extra builtin functions are provided. These are outlined below.
 
-### `section(name, description=None, check=True, log=True)`
 
-This function adds a new section to the sections list. If present, the description is used to provide a brief overview of the section purpose.
+**`section(name, description=None, check=True, log=True)`**
 
-If `check` is `True`, the resulting section will attempt to catch SIGUSR1 and SIGUSR2 messages (which are sent by SGE before a job is killed) and log a suitable message before job termination.
+This function adds a new section to the sections list. All subsequent functions that modify a section will act upon the last section created.
 
-If `log` is `True`, section start and completion logs are written.
+* If present, the description is used to provide a brief overview of the section purpose.
+* If `check` is `True`, the resulting section will attempt to catch SIGUSR1 and SIGUSR2 messages (which are sent by SGE before a job is killed) and log a suitable message before job termination.
+* If `log` is `True`, section start and completion logs are written.
 
-### limits
-### options
+~~~python
+section("PRINT_{VARIABLE}", "Outputs the value of the {VARIABLE} environment variable to log", check=False, log=False)
+~~~
+
+**`limits(**kwargs)`**
+
+This function defines limits that are passed to the scheduler at submission time. Limits are specified as keyword-defined strings. For SGE, a minimum of time and memory specifications must be given. For example the code below will request a maximum run time of one minute and a maximum vmem of 10Mb. The limit types and values are neither enforced or checked by `qsubsec`. When outputting bash, the limits are ignored.
+
+~~~python
+limits(time='00:01:00', vmem='10M')
+~~~
+
+**`options(*args)`**
+
+This function sets the options that are passed to the scheduler at submission time. Options are specified as strings. Options are not checked by `qsubsec`. The preceding hyphen should be omitted.
+
+~~~python
+options('V', 'cwd', 'notify')
+~~~
+
 ### hold
 ### require
 ### outputFile

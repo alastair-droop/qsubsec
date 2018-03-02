@@ -60,13 +60,11 @@ def main():
     # Check for illegal option combinations:
     if (args.input_json is True) and (args.show_tokens is True): error('Can not show tokens when reading processed JSON')
 
-
     # If requested, load the sections from JSON:
     if args.input_json is True:
         log.info('reading JSON from file "{}"'.format(args.template_file))
         try: sections = SectionList.fromJSONFile(args.template_file)
-        except: raise
-        # except: error('failed to read JSON section data from "{}"'.format(args.template_file))
+        except: error('failed to read JSON section data from "{}"'.format(args.template_file))
     else:
         # Read & process the template file
         log.info('reading template file "{}"'.format(args.template_file))
