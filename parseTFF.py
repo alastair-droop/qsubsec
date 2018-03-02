@@ -74,6 +74,7 @@ def main():
         except BaseException as err: error(str(err))
 
     # Parse a specific string, if requested:
+    print(args.parse_string)
     if args.parse_string is not None:
         log.info('parsing string "{}"'.format(args.parse_string))
         try:
@@ -115,5 +116,3 @@ def main():
         for i in range(res_n):
             if args.print_all is True: print(longFormat(res[i]))
             else: print('[{}]: {}'.format(i, res[i].asDict()))
-
-main()
