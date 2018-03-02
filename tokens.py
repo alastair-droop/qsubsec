@@ -389,9 +389,15 @@ class TFFParser(object):
     def setRecursionLimit(self, limit): self._recursion_limit = limit
     def parse(self, filename, depth=0):
         """Parse a TFF file to yield a TokenSet"""
-        log.info('extracting TFF string from file "{}"'.format(filename))
-        with open(filename, 'rt') as input_file:
-            input_string = input_file.read()
+        if hasattr(filename, 'read'):
+            # filename looks like a file handle (i.e. it has a read method):
+            log.info('extracting TFF string from file handle "{}"'.format(filename.name))
+            input_string = filename.read()
+        else:
+            # filename does not look like a file handle:
+            log.info('extracting TFF string from file "{}"'.format(filename))
+            with open(filename, 'rt') as input_file:
+                input_string = input_file.read()
         return self.parseString(input_string, depth=0)
     def parseHandle(self, file_handle, depth=0):
         """Parse a TFF file to yield a TokenSet"""

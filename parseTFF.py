@@ -19,8 +19,8 @@ def main():
     output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
     output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
     output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
-    output_types.add_argument('-s', '--parse-string', dest='parse_string', default=None, help='parse a specific string')
-    parser.add_argument(metavar='file', dest='input_files', nargs='*', default=['-'], help='input TFF file(s) to parse')
+    output_types.add_argument('-s', '--string', dest='parse_string', metavar='str', default=None, help='parse a specific string')
+    parser.add_argument(metavar='file', dest='input_files', nargs='*', default=[], help='input TFF file(s) to parse')
     args = parser.parse_args()
 
     # A function to quit with an error:
@@ -66,12 +66,11 @@ def main():
     if args.parse_string is not None:
         log.info('parsing string "{}"'.format(args.parse_string))
         try:
-            for i in ts.resolveString(args.parse_string):
-                print(i)
+            ts_new = tsp.parseString(args.parse_string)
+            ts.extend(ts_new)
         except tokens.CyclicTokenDependencyError as err: error('cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
         except tokens.MissingTokenError as err: error('missing tokens "{}"'.format('", "'.join(err.tokens)))
         except BaseException as err: error(str(err))
-        exit(0)
 
     # Print out the dependency graph, if requested:
     if args.print_graph is True:
@@ -105,3 +104,5 @@ def main():
         for i in range(res_n):
             if args.print_all is True: print(longFormat(res[i]))
             else: print('[{}]: {}'.format(i, res[i].asDict()))
+
+main()

@@ -154,6 +154,8 @@ message("The current user is $USER")
 
 When processing qsubsec files, the list of defined sections and tokens are available as `__sections__` and `__tokens__` respectively. This allows template files to use (and modify) these on the fly.
 
+**NB:** As the template file is processed before execution, modification of the `__tokens__` object will not effect the behaviour of the section file itself. It is useful, however, when the section file reads other files, or in turn uses `qsubsec` to process other template files.
+
 ## Examples
 
 ### Example 1
