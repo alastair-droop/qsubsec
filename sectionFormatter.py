@@ -53,6 +53,7 @@ class BashFormatter(OutputFormatter):
             if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.PATH_READABLE: output.append('if ! test -r {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not readable'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.PATH_WRITABLE: output.append('if ! test -w {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not writable'.format(name)), section.errfile.getFilename(section.name)))
+            if requirement == Requirement.PATH_EXECUTABLE: output.append('if ! test -x {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not executable'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.ENV_SET: output.append('if [ -z ${{{0}+x}} ]; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: environment variable {} not set'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.ENV_UNSET: output.append('if [ -n ${{{0}+x}} ]; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: environment variable {} set'.format(name)), section.errfile.getFilename(section.name)))
         if section.log is True: output.append('{0} >> {1}'.format(cls.echoString('section {} started'.format(section.name)), section.outfile.getFilename(section.name)))
@@ -96,6 +97,7 @@ class QSUBFormatter(OutputFormatter):
             if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name))))
             if requirement == Requirement.PATH_READABLE: output.append('if ! test -r {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not readable'.format(name))))
             if requirement == Requirement.PATH_WRITABLE: output.append('if ! test -w {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not writable'.format(name))))
+            if requirement == Requirement.PATH_EXECUTABLE: output.append('if ! test -x {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not executable'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.ENV_SET: output.append('if [ -z ${{{0}+x}} ]; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: environment variable {} not set'.format(name))))
             if requirement == Requirement.ENV_UNSET: output.append('if [ -n ${{{0}+x}} ]; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: environment variable {} set'.format(name))))
         if section.check is True:

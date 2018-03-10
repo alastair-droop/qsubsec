@@ -73,6 +73,7 @@ This function tests for specific requirements, and stops the job (with an approp
 * `"PATH_PRESENT"`: Ensures that the given path is present
 * `"PATH_READABLE"`: Ensures that the given path is readable
 * `"PATH_WRITABLE"`: Ensures that the given path is writable
+* `"PATH_EXECUTABLE"`: Ensures that the given path is executable
 * `"ENV_SET"`: Ensures that the given environment variable is set
 * `"ENV_UNSET"`: Ensures that the given environment variable is not set
 

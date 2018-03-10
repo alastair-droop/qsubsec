@@ -17,7 +17,7 @@ import logging
 import argparse
 from sys import exit, stdin
 
-version = '3.0a1 (2018-03-01)'
+version = '3.0a2 (2018-03-10)'
 
 def main():
     # Create the command line interface:

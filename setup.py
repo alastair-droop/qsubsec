@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name = 'qsubsec',
-    version = '3.0a1',
+    version = '3.0a2',
     description = 'A simple Python-based preprocessor system for SGE job templates',
     author = 'Alastair Droop',
     author_email = 'alastair.droop@gmail.com',

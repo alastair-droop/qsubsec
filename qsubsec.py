@@ -25,7 +25,7 @@ import subprocess
 from math import floor, log10
 from sys import exit, stdin, exc_info
 
-version = '3.0a1 (2018-03-01)'
+version = '3.0a2 (2018-03-10)'
 
 def main():
     # Create the command line interface:
