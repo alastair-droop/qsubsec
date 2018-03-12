@@ -25,12 +25,14 @@ import subprocess
 from math import floor, log10
 from sys import exit, stdin, exc_info
 
-version = '3.0a2 (2018-03-10)'
+# Get the version:
+version = {}
+with open('./version.py') as version_file: exec(version_file.read(), version)
 
 def main():
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Expand QSUB section templates')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
     parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
     parser.add_argument('-r', '--raise-errors', dest='raise_errors', action='store_true', default=False, help='raise full errors when processing templates')
     parser.add_argument('-i', '--input-json', dest='input_json', action='store_true', default=False, help='input JSON-formatted section data instead of template file')
@@ -39,7 +41,7 @@ def main():
     submission_group = parser.add_argument_group('Submission options')
     submission_group.add_argument('-f', '--sub-format', dest='submission_format', default='qsub', choices=['qsub', 'bash'], help='the submission format to use when using -s')
     submission_group.add_argument('--sub-exec', dest='submission_exec', metavar='exec', default=None, help='override the default executable to use when submitting with -s')
-    submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=20, type=int, help='submission timeout in seconds when submitting with -s (default 20s)')
+    submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=None, type=int, help='submission timeout in seconds when submitting with -s (default none)')
     submission_group.add_argument('-p', '--purge-logs', dest='purge_logs', action='store_true', default=False, help='purge section log files when submitting with -s')
     # Output actions:
     output_group = parser.add_argument_group('Output actions')

@@ -49,8 +49,8 @@ class BashFormatter(OutputFormatter):
     def frontMatter(cls, section):
         output = []
         for requirement, name in section.requirements:
-            if requirement == Requirement.PATH_ABSENT: output.append('if ! test -e {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not found'.format(name)), section.errfile.getFilename(section.name)))
-            if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name)), section.errfile.getFilename(section.name)))
+            if requirement == Requirement.PATH_ABSENT: output.append('if ! test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name))))
+            if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not found'.format(name))))
             if requirement == Requirement.PATH_READABLE: output.append('if ! test -r {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not readable'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.PATH_WRITABLE: output.append('if ! test -w {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not writable'.format(name)), section.errfile.getFilename(section.name)))
             if requirement == Requirement.PATH_EXECUTABLE: output.append('if ! test -x {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not executable'.format(name)), section.errfile.getFilename(section.name)))
@@ -93,8 +93,8 @@ class QSUBFormatter(OutputFormatter):
         output.append('{} -o {}'.format(cls.option_prefix, section.outfile.getFilename(section.name)))
         output.append('{} -e {}'.format(cls.option_prefix, section.errfile.getFilename(section.name)))
         for requirement, name in section.requirements:
-            if requirement == Requirement.PATH_ABSENT: output.append('if ! test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not found'.format(name))))
-            if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name))))
+            if requirement == Requirement.PATH_ABSENT: output.append('if ! test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} exists'.format(name))))
+            if requirement == Requirement.PATH_PRESENT: output.append('if test -e {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not found'.format(name))))
             if requirement == Requirement.PATH_READABLE: output.append('if ! test -r {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not readable'.format(name))))
             if requirement == Requirement.PATH_WRITABLE: output.append('if ! test -w {0}; then {1}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not writable'.format(name))))
             if requirement == Requirement.PATH_EXECUTABLE: output.append('if ! test -x {0}; then {1} >> {2}; exit 1; fi'.format(name, cls.echoString('ERROR: file {} not executable'.format(name)), section.errfile.getFilename(section.name)))

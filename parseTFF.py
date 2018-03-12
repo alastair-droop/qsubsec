@@ -17,12 +17,14 @@ import logging
 import argparse
 from sys import exit, stdin
 
-version = '3.0a2 (2018-03-10)'
+# Get the version:
+version = {}
+with open('./version.py') as version_file: exec(version_file.read(), version)
 
 def main():
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Parse qsubsec token TFF files')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version))
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
     parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
     parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default='TFF', help='output format for single resolved token sets')
     output_types = parser.add_mutually_exclusive_group(required=False)

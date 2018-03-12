@@ -1,8 +1,12 @@
 from setuptools import setup
 
+# Get the version:
+version = {}
+with open('./version.py') as version_file: exec(version_file.read(), version)
+
 setup(
     name = 'qsubsec',
-    version = '3.0a2',
+    version = version['__version__'],
     description = 'A simple Python-based preprocessor system for SGE job templates',
     author = 'Alastair Droop',
     author_email = 'alastair.droop@gmail.com',
