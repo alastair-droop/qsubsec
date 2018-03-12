@@ -19,7 +19,7 @@ from sys import exit, stdin
 
 # Get the version:
 version = {}
-with open('./version.py') as version_file: exec(version_file.read(), version)
+with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'version.py')) as f: exec(f.read(), version)
 
 def main():
     # Create the command line interface:

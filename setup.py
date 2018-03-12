@@ -1,8 +1,10 @@
 from setuptools import setup
+import os.path
+import qsubsec
 
 # Get the version:
 version = {}
-with open('./version.py') as version_file: exec(version_file.read(), version)
+with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'version.py')) as f: exec(f.read(), version)
 
 setup(
     name = 'qsubsec',
@@ -17,7 +19,7 @@ setup(
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
         'Programming Language :: Python :: 3'
     ],
-    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'qsubsec', 'parseTFF'],
+    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'qsubsec', 'parseTFF', 'version'],
     install_requires = [
         'pyparsing>=2.2.0'
     ],
