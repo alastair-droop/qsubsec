@@ -29,6 +29,8 @@ cd qsubsec3
 python setup.py install
 ~~~
 
+You will need python3 (>=3.3) to use qsubsec3.
+
 If you do not have admin privileges, you can install this locally using `python setup.py install --user`.
 
 After installation, you can verify that you have the correct version using `qsubsec -v`.
