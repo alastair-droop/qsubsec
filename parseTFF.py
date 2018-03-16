@@ -117,3 +117,6 @@ def main():
         for i in range(res_n):
             if args.print_all is True: print(longFormat(res[i]))
             else: print('[{}]: {}'.format(i, res[i].asDict()))
+
+# If run as main, run main():
+if __name__ == '__main__': main()

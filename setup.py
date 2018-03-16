@@ -1,6 +1,5 @@
 from setuptools import setup
 import os.path
-import qsubsec
 
 # Get the version:
 version = {}
