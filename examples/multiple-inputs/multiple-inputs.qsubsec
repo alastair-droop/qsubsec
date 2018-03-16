@@ -1,8 +1,0 @@
-section('process-{ID}', description='Processes a sample set')
-limits(time='00:10:00', vmem='1G')
-options(['V', 'cwd', 'notify'])
-output('{BASE}/logs')
-error('{BASE}/logs')
-require('{BASE}/input/{ID}.txt', 'path_readable')
-require('{BASE}/output', 'path_writable')
-command('{BASE}/process-sample.R {BASE}/input/{ID}.txt > {BASE}/output/{ID}-mean.txt', name='process_{ID}', log=True, test=True)
