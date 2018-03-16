@@ -24,12 +24,12 @@ For more information on the TFF token definition syntax and the qsubsec template
 Installation should be as simple as:
 
 ~~~bash
-git clone https://github.com/alastair-droop/qsubsec3.git
-cd qsubsec3
+git clone https://github.com/alastair-droop/qsubsec.git
+cd qsubsec
 python setup.py install
 ~~~
 
-You will need python3 (>=3.3) to use qsubsec3.
+You will need python3 (>=3.3) to use qsubsec.
 
 If you do not have admin privileges, you can install this locally using `python setup.py install --user`.
 
