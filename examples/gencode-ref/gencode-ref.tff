@@ -1,0 +1,60 @@
+# The maximum wall time for the run is mandatory on many SGE systems.
+# This is specified as hh:mm:ss
+MAX_TIME="12:00:00"
+
+# The GENCODE_REF template uses -pe smp <n> to specify a number of cores.
+# Values too large for the cluster will never be submitted:
+N_CPU = "4"
+
+# As we're using -pe smp, we need to specify the maximum memory per core:
+# The total memory available to STAR will be {MAX_MEM} * {N_CPU}:
+MAX_MEM = "4G"
+
+# Set the GENCODE release information that we want.
+# We need to specify a species, a genome accession, a genome patch number
+# and a GENCODE release. These are used for dtermining a standard directory
+# naming structure and also building the FTP URLs to use when downloading data:
+GENCODE_SPECIES = "human" # This should be "human" or "mouse"
+GENCODE_RELEASE = "27"
+GENCODE_ACCESSION = "GRCh38"
+GENCODE_PATCH = "10"
+
+# Now that we've got all of the GENCODE data, we can define a standard ID for
+# the reference genome we're processing:
+REF_ID = "{GENCODE_ACCESSION}p{GENCODE_PATCH}_{GENCODE_RELEASE}"
+
+# Define the base directory that the script will create and populate.
+# This is based upon the {REF_ID}. In this example, it is rooted in the directory
+# set in the $REFS environment variable:
+BASE_DIR = "$REFDIR/{REF_ID}"
+
+# The script logs will be written to a specific log directory in {BASE_DIR}:
+LOG_DIR = "{BASE_DIR}/logs"
+
+# As we do not want to have to keep copying temporary data to the Lustre filesystem,
+# we need to specify a temporary location on the node. We can use $TMPDIR for this:
+TEMP_DIR = "$TMPDIR"
+
+# The output (FASTA and GTF) files written need to have a consistent naming.
+# We create a standard file prefix based on the {BASE_DIR} and the {REF_ID}:
+BASE = "{BASE_DIR}/{REF_ID}"
+
+# We can now define the FASTA and GTF file names we'll be using:
+FASTA = "{BASE}.fasta"
+GTF = "{BASE}.gtf"
+
+# Define the executables used to process the data:
+WGET = "wget"
+GZIP = "gzip"
+SAMTOOLS = "samtools"
+STAR = "STAR"
+
+# Define the FTP URLs we'll use to download the data from GENCODE.
+# The {URL_BASE} is te base location for the specified species.
+# Thye FASTA and GTF locations are b ased on the release and accessions defined above:
+URL_BASE = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_{GENCODE_SPECIES}"
+URL_FASTA = "{URL_BASE}/release_{GENCODE_RELEASE}/{GENCODE_ACCESSION}.p{GENCODE_PATCH}.genome.fa.gz"
+URL_GTF = "{URL_BASE}/release_{GENCODE_RELEASE}/gencode.v{GENCODE_RELEASE}.annotation.gtf.gz"
+
+# Set the specific STAR genome building options:
+OVERHANG = 150

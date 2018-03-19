@@ -1,0 +1,48 @@
+# This qsubsec script downloads reference FASTA & GTF files from GENCODE and generates a STAR index from them.
+# Alastair Droop, 2018-03-16
+
+from os import makedirs
+from os.path import exists, expanduser, expandvars
+
+section('GENCODEREF-{REF_ID}', description='Download and process the GENCODE {GENCODE_SPECIES} release {GENCODE_RELEASE} reference {GENCODE_ACCESSION}.p{GENCODE_PATCH}.')
+options('V', 'cwd', 'notify')
+limits(h_rt='{MAX_TIME}', h_vmem='{MAX_MEM}')
+
+# Set the number of processors we want:
+options('pe smp {N_CPU}')
+
+# Attempt to set up the reference folder:
+try:
+    makedirs(expandvars(expanduser('{LOG_DIR}')))
+    message('created reference log directory "{LOG_DIR}"')
+except FileExistsError: message('reference log directory "{LOG_DIR}" already exists')
+except: raise Exception('Failed to create reference log directory {LOG_DIR}')
+outputs('{LOG_DIR}')
+
+# Check that the directories are all OK:
+for p in ['{BASE_DIR}', '{LOG_DIR}', '{TEMP_DIR}']:
+    require(p, 'PATH_READABLE')
+    require(p, 'PATH_WRITABLE')
+
+# Check that all of the executables are OK:
+for e in ['{WGET}', '{SAMTOOLS}', '{GZIP}', '{STAR}']: require(e, 'PATH_EXECUTABLE')
+
+# Define the data we need to get:
+data_files = [('FASTA', '{FASTA}', '{URL_FASTA}'), ('GTF', '{GTF}', '{URL_GTF}')]
+for f in data_files:
+    if not exists(f[1]):
+        # Download the input file from GENCODE:
+        message('input %s file %s does not exist; downloading from "%s"' % (f[0], f[1], f[2]))
+        command('{WGET} -q -O%s.gz %s' % (f[1], f[2]), name='download_%s' % f[0])
+        # Decompress the gzipped file:
+        command('{GZIP} -d %s.gz' % f[1], name='decompress_%s' % f[0])
+    else: message('input %s file %s already exists' % (f[0], f[1]))
+
+# If the FASTA file has not already been indexed, then index it:
+if not exists('{FASTA}.fai'):
+    message('input FASTA index {FASTA}.fai does not exist; re-indexing')
+    command('{SAMTOOLS} faidx {FASTA}', name='index_fasta')
+else: message('input FASTA index {FASTA}.fai already exists')
+
+# Re-create the STAR index:
+command('{STAR} --runMode genomeGenerate --runThreadN {N_CPU} --outTmpDir {TEMP_DIR}/STAR --outFileNamePrefix {LOG_DIR}/STAR- --genomeDir {BASE_DIR} --genomeFastaFiles {FASTA} --sjdbGTFfile {GTF} --sjdbOverhang {OVERHANG} > {LOG_DIR}/STAR-index.log', name='star_index')
