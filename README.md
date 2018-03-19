@@ -40,3 +40,28 @@ Although `qsubsec` can be run on most machines, the qsub executable must be avai
 ## Licence
 
 These tools are released under the [GNU General Public License version 3](http://www.gnu.org/licenses/gpl.html).
+
+## Reference
+
+If you use qsubsec for any published work, please reference the [original paper](https://doi.org/10.1093/bioinformatics/btv698) as:
+
+Alastair P. Droop; "qsubsec: a lightweight template system for defining sun grid engine workflows", *Bioinformatics*, Volume **32**, Issue 8, 15 April 2016, Pages 1267–1268, `https://doi.org/10.1093/bioinformatics/btv698`
+
+
+BibTex:
+
+~~~latex
+@article{doi:10.1093/bioinformatics/btv698,
+author = {Droop, Alastair P.},
+title = {qsubsec: a lightweight template system for defining sun grid engine workflows},
+journal = {Bioinformatics},
+volume = {32},
+number = {8},
+pages = {1267-1268},
+year = {2016},
+doi = {10.1093/bioinformatics/btv698},
+URL = { + http://dx.doi.org/10.1093/bioinformatics/btv698},
+eprint = {/oup/backfile/content_public/journal/bioinformatics/32/8/10.1093_bioinformatics_btv698/3/btv698.pdf}
+}
+~~~
+
