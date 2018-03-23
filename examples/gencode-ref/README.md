@@ -1,6 +1,6 @@
 ## Overview
 
-The `gencode-ref` example section shows many of the functions of qsubsec. The function of the this section is to identify and download the `.FASTA` and `.GTF` files for a specific [GENCODE](https://www.gencodegenes.org) reference and to use these files to build a [STAR](https://github.com/alexdobin/STAR) reference genome. The steps involved in this process are:
+The `gencode-ref` example section shows many of the functions of qsubsec. The function of this section is to identify and download the `.FASTA` and `.GTF` files for a specific [GENCODE](https://www.gencodegenes.org) reference and to use these files to build a [STAR](https://github.com/alexdobin/STAR) reference genome. The steps involved in this process are:
 
 1. Identify and download the `.FASTA` and `.GTF` files for a specific GENCODE release;
 2. Decompress the input `.FASTA` and `.GTF` files;
@@ -19,7 +19,7 @@ makedirs(expandvars(expanduser('{LOG_DIR}')))
 
 This line of code is valid Python once the placeholder `{LOG_DIR}` has been replaced with a valid string. This is how the qsubsec system works: The `.qsubsec` template file is read in and then has all the placeholders contained within it replaced with their values. The processed file is then executed as a Python3 script to generate the sections to submit.
 
-The values of the tokens are read from the token `.TFF` file (`gencode-ref.tff`). The token definition language is extremely simple but remarkable powerful. Documentation is available [here](https://github.com/alastair-droop/qsubsec/blob/master/docs/TFF-format.md).
+The values of the tokens are read from the token `.TFF` file (`gencode-ref.tff`). The token definition language is extremely simple yet remarkably powerful. Documentation is available [here](https://github.com/alastair-droop/qsubsec/blob/master/docs/TFF-format.md).
 
 We will now go through how to use these two files together to analyse and run the gencode-ref script.
 
@@ -96,7 +96,7 @@ echo "[`date`]: command star_index completed" >> $REF_DIR/GRCh38p10_27/logs/outp
 echo "[`date`]: section GENCODEREF-GRCh38p10_27 completed" >> $REF_DIR/GRCh38p10_27/logs/output-GENCODEREF-GRCh38p10_27.log
 ~~~
 
-We can see that most of the generated script is testing and logging. We can see only the commands that will be run by using the `-c` flag:
+We can see that most of the generated script is taken up by testing and logging code. We can extract only the commands that will be run by using the `-c` flag:
 
 ~~~bash
 qsubsec -fbash ./gencode-ref.qsubsec ./gencode-ref.tff
@@ -126,6 +126,16 @@ returns:
 ~~~
 GENCODEREF-GRCh38p10_27	Download and process the GENCODE human release 27 reference GRCh38.p10.
 ~~~
+
+### The Difference between Submission time and Run time
+
+We can now examine the commands that will be executed when the script runs (i.e. at *run time*). It is also possible for the script itself to perform computation (i.e. at *submission time*). As the template file is Python, any valid Python code can be used inside it. This allows us to perform startup and input checking tasks before we run the script or submit it to the queue. Although *submission time* execution can be very useful, there are a few things to remember:
+
+* The run-time script is not submitted through the queue, so should be as short as possible;
+* The run-time script will be run on a different machine (likely the job scheduler, or "login" node), and so may see a different environment;
+* As the submitted jobs may wait a long time before they are executed, there can be a long time between submission and running.
+
+A common task during submission-time is to make sure that the necessary directory structure exists. Output and data directories can easily be created at run-time using `mkdir -p`, but the full path for the qsub log and error files must exist *before* a qsub job is started. Thus, it is sensible to check for this at submission time.
  
 ### Specifying Tokens
 
@@ -280,7 +290,7 @@ Note that *all combinations* of multiple tokens are generated. If this is not wh
 
 ## Filtering Commands
 
-It is sometimes not good desirable to run all of the commands specified in a template. For example, we might not wish to run the STAR indexing script, but simply to download the data for our two reference releases. We can easily do this once we know the command names. These are returned by the `-c` flag:
+It is sometimes not desirable to run all of the commands specified in a template. For example, we might not wish to run the STAR indexing script, but simply to download the data for our two reference releases. We can easily do this once we know the command names. These are returned by the `-c` flag:
 
 ~~~bash
 qsubsec -c ./gencode-ref.qsubsec ./gencode-ref.tff GENCODE_RELEASE=21,27
