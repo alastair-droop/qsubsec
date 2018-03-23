@@ -13,6 +13,8 @@
 
 import tokens as qstokens
 from sections import Option, CommandType, Section, SectionList
+from os import makedirs
+from os.path import expanduser, expandvars
 import logging as log
 import json
 from collections import OrderedDict
@@ -45,6 +47,10 @@ class Template(object):
     def execute(self, tokens):
         def QSBSection(name, description=None, check=True, log=True):
             self.sections.newSection(name, description=description, check=check, log=log)
+        def QSBValidate(path):
+            try: makedirs(expandvars(expanduser(path)))
+            except FileExistsError: pass
+            except: raise Exception('Failed to create reference log directory {}'.format(path))
         def QSBLimits(**kwargs):
             for limit, value in kwargs.items():
                 self.sections.latest.limits[limit] = value
@@ -62,9 +68,10 @@ class Template(object):
         def QSBErrfile(path, name=None):
             self.sections.latest.errfile.path = path
             self.sections.latest.errfile.name = name
-        def QSBOutputs(path):
+        def QSBOutputs(path, validate=True):
             self.sections.latest.outfile.path = path
             self.sections.latest.errfile.path = path
+            if validate is True: QSBValidate(path)
         def QSBCommand(cmd, name=None, test=True, log=True):
             self.sections.latest.commands.newCommand(cmd=cmd, name=name, test=test, log=log, cmdtype=CommandType.command)
         def QSBLogOutput(message):
@@ -73,7 +80,7 @@ class Template(object):
             self.sections.latest.commands.newCommand(cmd=message, name=None, test=False, log=False, cmdtype=CommandType.log_err)
         for formatted_data in self.format(tokens):
             log.info('executing formatted template')
-            exec(formatted_data, {'__sections__':self.sections, '__tokens__':tokens, 'section':QSBSection, 'limits':QSBLimits, 'options':QSBOptions, 'hold':QSBHold, 'require':QSBRequire, 'outputFile':QSBOutfile, 'errorFile':QSBErrfile, 'outputs':QSBOutputs, 'command':QSBCommand, 'message':QSBLogOutput, 'error':QSBLogError})
+            exec(formatted_data, {'__sections__':self.sections, '__tokens__':tokens, 'section':QSBSection, 'validate': QSBValidate, 'limits':QSBLimits, 'options':QSBOptions, 'hold':QSBHold, 'require':QSBRequire, 'outputFile':QSBOutfile, 'errorFile':QSBErrfile, 'outputs':QSBOutputs, 'command':QSBCommand, 'message':QSBLogOutput, 'error':QSBLogError})
     formatter = property(getFormatter, setFormatter, "Formatter used for parsing tokens")
     sections = property(getSections, None, "The template sections")
     string = property(getString, setString, "The template string")

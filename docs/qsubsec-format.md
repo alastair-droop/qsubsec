@@ -19,6 +19,10 @@ Token Files define the placeholder tokens used to generate qsubsec templates. Th
 
 Tokens placeholders are used to specify where the value of a token is to be filled in. Token placeholders are specified using the token name in parentheses (for example `{NAME}`).
 
+## Submission Time vs Run Time
+
+There are two distinct execution phases for qsubsec templates. THe Python template file is executed at submission time to generate the sections and to (optionally) submit them. Subsequently, at run time, the generated sections are executed by bash of the job scheduler. As the template files can contain any Python commands, extensive computation can be performed at submission time. The most frequent use of this is to create the necessary directories, and to validate input data.
+
 ## Section File Format
 
 After token replacement, section files are executed as Python code. However, several extra builtin functions are provided. These are outlined below.
@@ -84,6 +88,12 @@ require("NCPU", "ENV_SET")
 require("/path/to/input.txt", "PATH_READABLE")
 ~~~
 
+### `validate(path,)`
+
+THis function silently attempts to create the complete path `path` if it does not already exist. If the attempt fails for any reason, the function will raise an error.
+
+**NB:** This function runs at *submission time* (not run time), thus will not alter the submitted section.
+
 ### `outputFile(path, name=None)` & `errorFile(path, name=None)`
 
 These functions set the output and error log files.
@@ -98,11 +108,12 @@ outputFile("/output", "output.txt")
 errorFile("/logs")
 ~~~
 
-### `outputs(path)`
+### `outputs(path, validate=True)`
 
 This function sets both the output and error logs to write to the specified directory with their default file names.
 
 * The `path` argument sets the log file directory that both the output and error files will be written to.
+* If `validate` is `True`, the function will use `validate` (see above) to silently create the log directory at submission time. This is necessary when submitting a job through `qsub`, as the log and error file paths must exist *before* job submission, or the submission process will fail.
 
 For example, the code below writes both logs to their default names in the `/logs` directory:
 
