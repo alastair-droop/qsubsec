@@ -90,7 +90,7 @@ require("/path/to/input.txt", "PATH_READABLE")
 
 ### `validate(path,)`
 
-THis function silently attempts to create the complete path `path` if it does not already exist. If the attempt fails for any reason, the function will raise an error.
+This function silently attempts to create the complete path `path` if it does not already exist. If the attempt fails for any reason, the function will raise an error.
 
 **NB:** This function runs at *submission time* (not run time), thus will not alter the submitted section.
 
