@@ -14,10 +14,10 @@ The stages in template processing are:
 ## Usage
 
 ~~~
-usage: qsubsec.py [-h] [-v] [-V {error,warning,info,debug}] [-r] [-i] [-j]
-                  [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
-                  [-t | -d | -c | -s]
-                  template [tokens [tokens ...]]
+usage: qsubsec [-h] [-v] [-V {error,warning,info,debug}] [-r] [-i] [-j]
+               [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
+               [-l regex] [-t | -d | -c | -s]
+               template [tokens [tokens ...]]
 
 Expand QSUB section templates
 
@@ -41,8 +41,12 @@ Submission options:
   --sub-exec exec       override the default executable to use when submitting
                         with -s
   --sub-timeout sec     submission timeout in seconds when submitting with -s
-                        (default 20 sec)
+                        (default none)
   -p, --purge-logs      purge section log files when submitting with -s
+  -l regex, --filter-commands regex
+                        only include commands whose names match the regular
+                        expression regex. If regex is prefixed with ! then the
+                        regular expression is inverted
 
 Output actions:
   -t, --tokens          show the tokens referred to in the template file

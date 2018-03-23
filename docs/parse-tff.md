@@ -5,40 +5,26 @@ The `parse-tff` utility parses TFF-formatted token files. Although primarily a d
 ## Usage
 
 ~~~
-usage: qsubsec.py [-h] [-v] [-V {error,warning,info,debug}] [-r] [-i] [-j]
-                  [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
-                  [-t | -d | -c | -s]
-                  template [tokens [tokens ...]]
+usage: parse-tff [-h] [-v] [-V {error,warning,info,debug}]
+                 [-o {TFF,JSON,dict}] [-q | -a | -i | -g | -s str]
+                 [file [file ...]]
 
-Expand QSUB section templates
+Parse qsubsec token TFF files
 
 positional arguments:
-  template              template file or JSON-formatted section data
-  tokens                Token definitions
+  file                  input TFF file(s) to parse
 
 optional arguments:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
   -V {error,warning,info,debug}, --verbose {error,warning,info,debug}
                         Set logging level (default warning)
-  -r, --raise-errors    raise full errors when processing templates
-  -i, --input-json      input JSON-formatted section data instead of template
-                        file
-  -j, --output-json     return data in JSON format
-
-Submission options:
-  -f {qsub,bash}, --sub-format {qsub,bash}
-                        the submission format to use when using -s
-  --sub-exec exec       override the default executable to use when submitting
-                        with -s
-  --sub-timeout sec     submission timeout in seconds when submitting with -s
-                        (default 20 sec)
-  -p, --purge-logs      purge section log files when submitting with -s
-
-Output actions:
-  -t, --tokens          show the tokens referred to in the template file
-  -d, --describe        describe the generated sections
-  -c, --commands        show the commands to be executed
-  -s, --submit          submit the commands
+  -o {TFF,JSON,dict}, --output-format {TFF,JSON,dict}
+                        output format for single resolved token sets
+  -q, --quiet           do not print output
+  -a, --print-all       output multiple resolved token sets in long format
+  -i, --print-input     output combined parsed input before resolution
+  -g, --print-graph     output dependency graph in DOT format
+  -s str, --string str  parse a specific string
 ~~~
 
