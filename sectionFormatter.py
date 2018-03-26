@@ -112,9 +112,9 @@ class QSUBFormatter(OutputFormatter):
         output = []
         for command in section.commands:
             if command.cmdtype is CommandType.log_out:
-                output.append('{0} > {1}'.format(cls.echoString('{}'.format(command.command)), section.outfile.getFilename(section.name)))
+                output.append('{0} >> {1}'.format(cls.echoString('{}'.format(command.command)), section.outfile.getFilename(section.name)))
             elif command.cmdtype is CommandType.log_err:
-                output.append('{0} > {1}'.format(cls.echoString('{}'.format(command.command)), section.errfile.getFilename(section.name)))
+                output.append('{0} >> {1}'.format(cls.echoString('{}'.format(command.command)), section.errfile.getFilename(section.name)))
             else:
                 if command.log is True: output.append(cls.echoString('command {} started'.format(command.name)))
                 if command.test is True: output.append('{0} || {{ {1}; exit 1; }}'.format(command.command, cls.echoString('command {} failed'.format(command.name))))
