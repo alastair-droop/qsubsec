@@ -23,7 +23,7 @@ import argparse
 import json
 import subprocess
 from math import floor, log10
-from sys import exit, stdin, exc_info
+from sys import exit, stdin, stdout, exc_info
 import re
 
 # Get the version:
@@ -150,8 +150,7 @@ def main():
             for command_i in reversed(range(len(section.commands))):
                 command_name = section.commands[command_i].name
                 match = command_re.match(command_name)
-                # if there is a match, then include
-                
+                # if there is a match, then include them:
                 if ((match is None) and (invert is True)) or ((match is not None) and (invert is False)):
                     log.debug('including matching command "{}"'.format(command_name))
                 else:
@@ -201,7 +200,7 @@ def main():
         for section in sections: print(formatter.newline.join(formatter.format(section)))
     else:
         # Submit the formatted data:
-        info_str = '[{{:{0}}}/{{:{0}}}]: submitted section {{}}'.format(floor(log10(len(sections))))
+        info_str = '[{{:{0}}}/{{:{0}}}]: submitting section {{}}'.format(floor(log10(len(sections))))
         submission_exec = args.submission_exec
         if submission_exec is None:
             if args.submission_format == 'qsub': submission_exec = 'qsub'
@@ -230,11 +229,12 @@ def main():
             except: error('failed to spawn subprocess "{}"'.format(' '.join(submission_exec)))
             # Attempt to communicate with the subprocess:
             try:
+                print(info_str.format(i + 1, len(sections), section_name), file=stdout)
+                stdout.flush()
                 output_data = proc.communicate(input=section_data, timeout=args.submission_timeout)
                 log.info('submitted section {} of {} ({})'.format(i + 1, len(sections), section_name))
                 if output_data[0] != None: log.info('submission stdout: "{}"'.format(output_data[0].strip()))
                 if output_data[1] != None: log.info('submission stderr: "{}"'.format(output_data[1].strip()))
-                print(info_str.format(i + 1, len(sections), section_name))
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.communicate()
