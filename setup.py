@@ -18,15 +18,16 @@ setup(
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
         'Programming Language :: Python :: 3'
     ],
-    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'qsubsec', 'parseTFF', 'version'],
+    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'scripts', 'version'],
     install_requires = [
         'pyparsing>=2.2.0'
     ],
     python_requires = '>=3',
     entry_points = {
         'console_scripts': [
-            'qsubsec=qsubsec:main',
-            'parse-tff=parseTFF:main'
+            'qsubsec=scripts:qsubsec',
+            'parse-tff=scripts:parseTFF',
+            'update-template=scripts:updateTemplate'
         ]
     }
 )

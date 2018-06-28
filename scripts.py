@@ -25,12 +25,29 @@ import subprocess
 from math import floor, log10
 from sys import exit, stdin, stdout, exc_info
 import re
+from signal import signal, SIGPIPE, SIG_DFL
+from pyparsing import *
 
 # Get the version:
 version = {}
 with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'version.py')) as f: exec(f.read(), version)
 
-def main():
+# A function to quit with an error:
+def error(log, msg, exit_code=1):
+    log.error(msg)
+    exit(exit_code)
+
+# A function to set up logging:
+def setupLog(verbosity):
+    log = logging.getLogger()
+    log_handler = logging.StreamHandler()
+    log.default_msec_format = ''
+    log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+    log.setLevel(verbosity.upper())
+    log.addHandler(log_handler)
+    return log
+    
+def qsubsec():
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Expand QSUB section templates')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
@@ -57,30 +74,20 @@ def main():
     parser.add_argument(dest='tokens', nargs='*', default=None, help='Token definitions')
     args = parser.parse_args()
 
-    # A function to quit with an error:
-    def error(msg, exit_code=1):
-        log.error(msg)
-        exit(exit_code)
-
     # A function to print an object in JSON fomat:
     def printJSON(x): print(json.dumps(x, indent='\t'))
 
     # Set up logging based on the verbosity level set by the command line arguments:
-    log = logging.getLogger()
-    log_handler = logging.StreamHandler()
-    log.default_msec_format = ''
-    log_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-    log.setLevel(args.verbosity_level.upper())
-    log.addHandler(log_handler)
+    log = setupLog(args.verbosity_level)
 
     # Check for illegal option combinations:
-    if (args.input_json is True) and (args.show_tokens is True): error('Can not show tokens when reading processed JSON')
+    if (args.input_json is True) and (args.show_tokens is True): error(log, 'Can not show tokens when reading processed JSON')
 
     # If requested, load the sections from JSON:
     if args.input_json is True:
         log.info('reading JSON from file "{}"'.format(args.template_file))
         try: sections = SectionList.fromJSONFile(args.template_file)
-        except: error('failed to read JSON section data from "{}"'.format(args.template_file))
+        except: error(log, 'failed to read JSON section data from "{}"'.format(args.template_file))
     else:
         # Read & process the template file
         log.info('reading template file "{}"'.format(args.template_file))
@@ -89,7 +96,7 @@ def main():
         tsp = qstokens.TFFParser()
         tokens = qstokens.TokenSet()
         try: template = Template.fromFile(args.template_file)
-        except: error('failed to read token file from "{}"'.format(args.template_file))
+        except: error(log, 'failed to read token file from "{}"'.format(args.template_file))
         
         # If requested, print out the tokens in the template file
         if args.show_tokens is True:
@@ -114,8 +121,8 @@ def main():
                     log.info('reading tokens from command line "{}"'.format(t))
                     ts_new = tsp.parseString(t)
                 tokens.extend(ts_new)
-            except qstokens.MissingTokenError as err: error('missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
-            except BaseException as err: error(str(err))
+            except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
+            except BaseException as err: error(log, str(err))
 
         # Execute the template to yield the sections:
         log.info('executing template')
@@ -123,12 +130,12 @@ def main():
         except qstokens.MissingTokenError as err:
             if args.raise_errors is True: raise
             missing = err.tokens
-            if len(missing) == 1: error('missing token {}'.format(list(missing)[0]))
-            else: error('missing tokens {}'.format(', '.join(missing)))
-        except qstokens.CyclicTokenDependencyError as err: error('cyclic dependencies ({})'.format(', '.join(err.tokens)))    
+            if len(missing) == 1: error(log, 'missing token {}'.format(list(missing)[0]))
+            else: error(log, 'missing tokens {}'.format(', '.join(missing)))
+        except qstokens.CyclicTokenDependencyError as err: error(log, 'cyclic dependencies ({})'.format(', '.join(err.tokens)))    
         except BaseException as err:
             if args.raise_errors is True: raise
-            error(str(err))
+            error(log, str(err))
     
         # Extract the section data from the template:
         sections = template.sections
@@ -144,7 +151,7 @@ def main():
             else: invert = False
             log.info('filtering commands with regular expression "{}"'.format(args.filter_commands))
             command_re = re.compile(args.filter_commands)
-        except: error('failed to parse the regular expression ({})'.format(args.filter_commands))
+        except: error(log, 'failed to parse the regular expression ({})'.format(args.filter_commands))
         # Iterate through all commands (in reverse order per section) and remove those that do not match:
         for section in sections:
             for command_i in reversed(range(len(section.commands))):
@@ -191,7 +198,7 @@ def main():
     # Process the commands through the specified output formatter:
     if args.submission_format == 'qsub': formatter = sectionFormatter.QSUBFormatter
     elif args.submission_format == 'bash': formatter = sectionFormatter.BashFormatter
-    else: error('no formatter for submission format {}'.format(args.submission_format))
+    else: error(log, 'no formatter for submission format {}'.format(args.submission_format))
     log.info('submission format is {}'.format(args.submission_format))
     if args.submit is False:    
         # Print the formatted data, rather than submitting it:
@@ -205,7 +212,7 @@ def main():
         if submission_exec is None:
             if args.submission_format == 'qsub': submission_exec = 'qsub'
             elif args.submission_format == 'bash': submission_exec = 'bash'
-            else: error('no submission executable set for format {}'.format(args.submission_format))
+            else: error(log, 'no submission executable set for format {}'.format(args.submission_format))
         log.info('submitting {} formatted sections using executable "{}"'.format(len(sections), submission_exec))
         submission_exec = submission_exec.split()
         for i in range(len(sections)):
@@ -225,8 +232,8 @@ def main():
             try:
                 log.info('spawning subprocess "{}"'.format(' '.join(submission_exec)))
                 proc = subprocess.Popen(args=submission_exec, stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
-            except FileNotFoundError: error('subprocess executable "{}" not found'.format(submission_exec[0]))
-            except: error('failed to spawn subprocess "{}"'.format(' '.join(submission_exec)))
+            except FileNotFoundError: error(log, 'subprocess executable "{}" not found'.format(submission_exec[0]))
+            except: error(log, 'failed to spawn subprocess "{}"'.format(' '.join(submission_exec)))
             # Attempt to communicate with the subprocess:
             try:
                 print(info_str.format(i + 1, len(sections), section_name), file=stdout)
@@ -244,5 +251,150 @@ def main():
                 proc.communicate()
                 log.warning('failed to submit job to subprocess "{}"'.format(' '.join(submission_exec)))
 
-# If run as main, run main():
-if __name__ == '__main__': main()
+def parseTFF():
+    # Create the command line interface:
+    parser = argparse.ArgumentParser(description='Parse qsubsec token TFF files')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
+    parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
+    parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default='TFF', help='output format for single resolved token sets')
+    output_types = parser.add_mutually_exclusive_group(required=False)
+    output_types.add_argument('-q', '--quiet', dest='quiet', action='store_true', default=False, help='do not print output')
+    output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
+    output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
+    output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
+    output_types.add_argument('-s', '--string', dest='parse_string', metavar='str', action='append', default=[], help='input TFF string(s) to parse')
+    parser.add_argument(metavar='file', dest='input_files', nargs='*', default=[], help='input TFF file(s) to parse')
+    args = parser.parse_args()
+    
+    # Handle broken pipes:
+    signal(SIGPIPE, SIG_DFL) 
+    
+    # A function to print a single token set in long format:
+    def longFormat(x):
+        if args.output_format == 'JSON': return x.asJSON()
+        if args.output_format == 'dict': return x.asDict()
+        return x.asTFF()
+
+    # Set up logging based on the verbosity level set by the command line arguments:
+    log = setupLog(args.verbosity_level)
+
+    # Initialise the TFF parser:
+    tsp = qstokens.TFFParser()
+    ts = qstokens.TokenSet()
+
+    # Run through each input file in turn:
+    for f in args.input_files:
+        if f == '-':
+            # Read from stdin:
+            f_path = stdin
+            log.info('processing stdin')
+        else:
+            f_path = os.path.realpath(f)
+            log.info('processing input file {}'.format(f_path))
+        # Parse the file:
+        try:
+            ts_new = tsp.parse(f_path)
+            ts.extend(ts_new)
+        except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
+        except BaseException as err: error(log, str(err))
+
+    # Parse a specific string, if requested:
+    for parse_string in args.parse_string:
+        log.info('parsing string "{}"'.format(parse_string))
+        try:
+            ts_new = tsp.parseString(parse_string)
+            ts.extend(ts_new)
+        except qstokens.CyclicTokenDependencyError as err: error(log, 'cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
+        except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}"'.format('", "'.join(err.tokens)))
+        except BaseException as err: error(log, str(err))
+
+    # Print out the dependency graph, if requested:
+    if args.print_graph is True:
+        log.info('generating dependency graph')
+        print(ts.asDot())
+        exit(0)
+
+    # Print out the complete input, if requested:
+    if args.print_input is True:
+        log.info('generating input token data')
+        print(longFormat(ts))
+        exit(0)
+
+    # Resolve the complete token set:
+    log.info('resolving tokens')
+    try: res = ts.resolve()
+    except qstokens.CyclicTokenDependencyError as err: error(log, 'cyclic dependencies: "{}"'.format('", "'.join(err.tokens)))
+    except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}"'.format('", "'.join(err.tokens)))
+    except BaseException as err: error(log, str(err))
+    res_n = len(res)
+
+    # If quiet was requested, simply exit at this stage, as there were no errors:
+    if args.quiet is True: exit(0)
+
+    # If a single token set is generated, print it in long-hand format:
+    if res_n == 1:
+        log.info('1 resolved token set generated')
+        print(longFormat(res[0]))
+    else:
+        log.info(format('{} resolved token sets generated:'.format(res_n)))
+        for i in range(res_n):
+            if args.print_all is True: print(longFormat(res[i]))
+            else: print('[{}]: {}'.format(i, res[i].asDict()))
+
+def updateTemplate():
+    # Create the command line interface:
+    parser = argparse.ArgumentParser(description='Update qsubsec2 template files to qsubsec3 format')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
+    parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
+    parser.add_argument(metavar='template', dest='template_file', default='-', help='template file to update')
+    args = parser.parse_args()
+    
+    # Handle broken pipes:
+    signal(SIGPIPE, SIG_DFL) 
+    
+    # Set up logging based on the verbosity level set by the command line arguments:
+    log = setupLog(args.verbosity_level)
+        
+    # Open the old template file:
+    try:
+        if args.template_file == '-':
+            # Read from stdin:
+            log.info('reading template from stdin')
+            template = stdin
+        else:
+            log.info('reading template from file {}'.format(args.template_file))
+            template = open(args.template_file, 'r')    
+    except: error(log, 'failed to open template file {}'.format(args.template_file))
+    
+    # Define the replacement regular expressions:
+    limits_re = re.compile('^(.*)limits\((.*)\)(.*)$')
+    options_re = re.compile('^(.*)options\(\[(.*)\]\)(.*)$')
+    requirement_re = re.compile('^(?P<pre>.*)require\((?P<req>(?P<qa>[\'\"])(?:.*)(?P=qa))\s*,\s*(?P<type>(?P<qb>[\'\"])(?:.*)(?P=qb))\)(?P<post>.*)$')
+    
+    #Iterate through the old template file:
+    for line in template.readlines():
+        # Update the limits:
+        match = limits_re.match(line)
+        if match != None:
+            log.debug('updating limits "{}"'.format(match.group(0)))
+            res = match.group(2)
+            for o, n in [('time', 'h_rt'), ('vmem', 'h_vmem')]:
+                res = res.replace('{}='.format(o), '{}='.format(n))
+            print('{}limits({}){}'.format(match.group(1), res, match.group(3)))
+            continue
+        # Update the options:
+        match = options_re.match(line)
+        if match != None:
+            log.debug('updating options "{}"'.format(match.group(0)))
+            print('{}options({}){}'.format(match.group(1), match.group(2), match.group(3)))
+            continue
+        #Update the requirments:
+        match = requirement_re.match(line)
+        if match != None:
+            log.debug('updating requirement "{}"'.format(match.group(0)))
+            res = match.groupdict()
+            res['type'] = res['type'].upper()
+            print('{pre}require({req}, {type}){post}'.format(**res))
+            continue
+        # Line does not match, so print the line back:
+        print(line, end='')
