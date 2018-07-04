@@ -45,7 +45,7 @@ section("PRINT_{VARIABLE}", "Outputs the value of the {VARIABLE} environment var
 This function defines limits that are passed to the scheduler at submission time. Limits are specified as keyword-defined strings. For SGE, a minimum of time and memory specifications must be given. For example the code below will request a maximum run time of one minute and a maximum vmem of 10Mb. The limit types and values are neither enforced or checked by `qsubsec`. When outputting bash, the limits are ignored.
 
 ~~~python
-limits(time="00:01:00", vmem="10M")
+limits(h_rt="00:01:00", h_vmem="10M")
 ~~~
 
 ### `options(*args)`
