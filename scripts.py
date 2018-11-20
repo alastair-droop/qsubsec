@@ -27,6 +27,7 @@ from sys import exit, stdin, stdout, exc_info
 import re
 from signal import signal, SIGPIPE, SIG_DFL
 from pyparsing import *
+from urllib.parse import urlparse
 
 # Get the version:
 version = {}
@@ -46,20 +47,29 @@ def setupLog(verbosity):
     log.setLevel(verbosity.upper())
     log.addHandler(log_handler)
     return log
+
+# A function to determine if a string should be treated as a file or a URL:
+# NB: This is based on whether a URL scheme is present
+def isURL(s):
+    if urlparse(s).scheme != '': return True
+    return False
     
 def qsubsec():
+    # Define the defaults:
+    defaults = {'verbosity_level':'warning', 'submission_format':'qsub', 'submission_timeout':None, 'url_encoding':'UTF-8'}
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Expand QSUB section templates')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
-    parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
+    parser.add_argument('-V', '--verbose', dest='verbosity_level', default=defaults['verbosity_level'], choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default {verbosity_level})'.format(**defaults))
     parser.add_argument('-r', '--raise-errors', dest='raise_errors', action='store_true', default=False, help='raise full errors when processing templates')
     parser.add_argument('-i', '--input-json', dest='input_json', action='store_true', default=False, help='input JSON-formatted section data instead of template file')
     parser.add_argument('-j', '--output-json', dest='output_json', action='store_true', default=False, help='return data in JSON format')
+    parser.add_argument('-e', '--url-encoding', dest='url_encoding', metavar='enc', default=defaults['url_encoding'], help='encoding to use when reading data from URLs (default {url_encoding})'.format(**defaults))
     # Submission options:
     submission_group = parser.add_argument_group('Submission options')
-    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default='qsub', choices=['qsub', 'bash'], help='the submission format to use when using -s')
+    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default=defaults['submission_format'], choices=['qsub', 'bash'], help='the submission format to use when using -s (default {submission_format})'.format(**defaults))
     submission_group.add_argument('--sub-exec', dest='submission_exec', metavar='exec', default=None, help='override the default executable to use when submitting with -s')
-    submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=None, type=int, help='submission timeout in seconds when submitting with -s (default none)')
+    submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=defaults['submission_timeout'], type=int, help='submission timeout in seconds when submitting with -s (default {submission_timeout})'.format(**defaults))
     submission_group.add_argument('-p', '--purge-logs', dest='purge_logs', action='store_true', default=False, help='purge section log files when submitting with -s')
     submission_group.add_argument('-l', '--filter-commands', dest='filter_commands', metavar='regex', default=None, help='only include commands whose names match the regular expression regex. If regex is prefixed with ! then the regular expression is inverted')
     # Output actions:
@@ -93,10 +103,15 @@ def qsubsec():
         log.info('reading template file "{}"'.format(args.template_file))
     
         # Load the tokens:
-        tsp = qstokens.TFFParser()
+        tsp = qstokens.TFFParser(encoding=args.url_encoding)
         tokens = qstokens.TokenSet()
-        try: template = Template.fromFile(args.template_file)
-        except: error(log, 'failed to read token file from "{}"'.format(args.template_file))
+        try:
+            if isURL(args.template_file):
+                log.info('reading template file from URL using encoding "{}"'.format(args.url_encoding))
+                template = Template.fromURL(args.template_file, encoding=args.url_encoding)
+            else:
+                template = Template.fromFile(args.template_file)
+        except: error(log, 'failed to read template file from "{}"'.format(args.template_file))
         
         # If requested, print out the tokens in the template file
         if args.show_tokens is True:
@@ -113,6 +128,9 @@ def qsubsec():
                     # Read from stdin:
                     log.info('reading tokens from stdin')
                     ts_new = tsp.parseHandle(stdin)
+                elif isURL(t):
+                    log.info('reading tokens from URL {}'.format(t))
+                    ts_new = tsp.parseURL(t)
                 elif os.path.exists(t):
                     f_path = os.path.realpath(t)
                     log.info('reading tokens from file {}'.format(f_path))
@@ -252,18 +270,21 @@ def qsubsec():
                 log.warning('failed to submit job to subprocess "{}"'.format(' '.join(submission_exec)))
 
 def parseTFF():
+    # Define the defaults:
+    defaults = {'verbosity_level':'warning', 'output_format':'TFF', 'url_encoding':'UTF-8'}
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Parse qsubsec token TFF files')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
-    parser.add_argument('-V', '--verbose', dest='verbosity_level', default='warning', choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default warning)')
-    parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default='TFF', help='output format for single resolved token sets')
+    parser.add_argument('-V', '--verbose', dest='verbosity_level', default=defaults['verbosity_level'], choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default {verbosity_level})'.format(**defaults))
+    parser.add_argument('-o', '--output-format', dest='output_format', choices={'JSON', 'TFF', 'dict'}, default=defaults['output_format'], help='output format for single resolved token sets (default {output_format})'.format(**defaults))
+    parser.add_argument('-e', '--url-encoding', dest='url_encoding', metavar='enc', default=defaults['url_encoding'], help='encoding to use when reading data from URLs (default {url_encoding})'.format(**defaults))
     output_types = parser.add_mutually_exclusive_group(required=False)
     output_types.add_argument('-q', '--quiet', dest='quiet', action='store_true', default=False, help='do not print output')
     output_types.add_argument('-a', '--print-all', dest='print_all', action='store_true', default=False, help='output multiple resolved token sets in long format')
     output_types.add_argument('-i', '--print-input', dest='print_input', action='store_true', default=False, help='output combined parsed input before resolution')
     output_types.add_argument('-g', '--print-graph', dest='print_graph', action='store_true', default=False, help='output dependency graph in DOT format')
     output_types.add_argument('-s', '--string', dest='parse_string', metavar='str', action='append', default=[], help='input TFF string(s) to parse')
-    parser.add_argument(metavar='file', dest='input_files', nargs='*', default=[], help='input TFF file(s) to parse')
+    parser.add_argument(metavar='file', dest='input_files', nargs='*', default=[], help='TFF input(s) to parse')
     args = parser.parse_args()
     
     # Handle broken pipes:
@@ -279,21 +300,27 @@ def parseTFF():
     log = setupLog(args.verbosity_level)
 
     # Initialise the TFF parser:
-    tsp = qstokens.TFFParser()
+    tsp = qstokens.TFFParser(encoding=args.url_encoding)
     ts = qstokens.TokenSet()
 
-    # Run through each input file in turn:
-    for f in args.input_files:
-        if f == '-':
-            # Read from stdin:
-            f_path = stdin
-            log.info('processing stdin')
-        else:
-            f_path = os.path.realpath(f)
-            log.info('processing input file {}'.format(f_path))
-        # Parse the file:
+    # Parse input source in turn:
+    for t in args.input_files:
         try:
-            ts_new = tsp.parse(f_path)
+            if t == '-':
+                # Read from stdin:
+                log.info('reading tokens from stdin')
+                ts_new = tsp.parseHandle(stdin)
+            elif isURL(t):
+                log.info('reading tokens from URL {}'.format(t))
+                ts_new = tsp.parseURL(t)
+                log.info('done reading URL') # REWMOVE THIS!
+            elif os.path.exists(t):
+                f_path = os.path.realpath(t)
+                log.info('reading tokens from file {}'.format(f_path))
+                ts_new = tsp.parse(f_path)
+            else:
+                log.info('reading tokens from command line "{}"'.format(t))
+                ts_new = tsp.parseString(t)
             ts.extend(ts_new)
         except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
         except BaseException as err: error(log, str(err))

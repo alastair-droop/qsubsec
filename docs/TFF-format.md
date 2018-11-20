@@ -14,7 +14,7 @@ TFF files can contain comments. Comments are started using the hash sign (`#`). 
 
 A simple token assignment takes the form:
 
-~~~
+~~~python
 NAME = VALUE
 ~~~
 
@@ -24,7 +24,7 @@ This statement will create a token with the name `NAME` and the value `VALUE`.
 
 Tokens can be assigned multiple values (called *iterated tokens*). This is done by providing a comma-separated list of values instead of a single value:
 
-~~~
+~~~python
 NAME = VALUE1, VALUE2
 ~~~
 
@@ -34,7 +34,7 @@ This statement will create a single token (`NAME`) with two values (`VALUE1` and
 
 Tokens placeholders are used to specify where the value of a token is to be filled in. Token placeholders are specified using the token name in parentheses (for example `{NAME}`). Placeholders can be used in all name and value fields in a TFF file. For example, a token name can be created using a placeholder, as can token values:
 
-~~~
+~~~python
 PERSON = Alice
 GREETING = "Good morning"
 GREET_{PERSON} = "{GREETING}, {PERSON}!"
@@ -46,13 +46,13 @@ In the above code, three tokens are created: `PERSON`, `GREETING`, and `GREET_Al
 
 The entire contents of a secondary TFF file can be imported using the `IMPORT` function:
 
-~~~
+~~~python
 # file_1.tff
 A=1
 IMPORT(file_2.tff)
 ~~~
 
-~~~
+~~~python
 # file_2.tff:
 A="new value"
 B=2
@@ -65,7 +65,7 @@ After processing `file_1.tff`, three tokens will be present: `A`, `B`, and `C`. 
 
 If a token is loaded and is no longer needed, it can be removed using the `REMOVE` function:
 
-~~~
+~~~python
 A=1
 REMOVE(A)
 ~~~
@@ -82,14 +82,14 @@ Files loaded as simple are not processed, so empty and comments will be included
 
 The function `FILE` reads data from a file normally, and the function `SFILE` loads data simply. For example:
 
-~~~
+~~~python
 # names.txt:
 Alice
 Bob
 Charlie
 ~~~
 
-~~~
+~~~python
 NAME = FILE(names.txt)
 ~~~
 

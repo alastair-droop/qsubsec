@@ -11,11 +11,13 @@ The stages in template processing are:
 
 `qsubsec` reads either a template file (and optionally a set of tokens), or a processed job file in JSON format.
 
+If either of the template file or token files start with a well-formed URL scheme (for example `https://`), they will be treated as URLs. **NB**: Currently, URL processing is very  limited.
+
 ## Usage
 
 ~~~
 usage: qsubsec [-h] [-v] [-V {error,warning,info,debug}] [-r] [-i] [-j]
-               [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
+               [-e enc] [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
                [-l regex] [-t | -d | -c | -s]
                template [tokens [tokens ...]]
 
@@ -34,6 +36,9 @@ optional arguments:
   -i, --input-json      input JSON-formatted section data instead of template
                         file
   -j, --output-json     return data in JSON format
+  -e enc, --url-encoding enc
+                        encoding to use when reading data from URLs (default
+                        UTF-8)
 
 Submission options:
   -f {qsub,bash}, --sub-format {qsub,bash}

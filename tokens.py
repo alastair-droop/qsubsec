@@ -128,11 +128,11 @@ class Token(object):
                 values.append(line)
         return Token(name=name, values=values)
     @classmethod
-    def fromURL(cls, name, url, simple=False):
+    def fromURL(cls, name, url, simple=False, encoding='UTF-8'):
         values = []
         with urlopen(url) as url_handle:
             for line in url_handle.readlines():
-                line = line.strip().decode('ASCII')
+                line = line.strip().decode(encoding)
                 if ((len(line) == 0) or line.startswith('#')) and (simple is False): continue
                 values.append(line)
         return Token(name=name, values=values)
@@ -373,9 +373,10 @@ class TokenSet(object):
 
 class TFFParser(object):
     """This class encapsulates a parser for TFF files"""
-    def __init__(self, recursionLimit=getrecursionlimit()):
+    def __init__(self, recursionLimit=getrecursionlimit(), encoding='UTF-8'):
         super(TFFParser, self).__init__()
         self.recursionLimit = recursionLimit
+        self.encoding = encoding
         # Define the TFF DSL:
         kw_chars = alphanums + '.' + '-' + '_' + '{' + '}' + '/' + ':'
         fn_chars = alphanums + '.' + '-' + '_' + '{' + '}' + '/' + ':'
@@ -399,6 +400,8 @@ class TFFParser(object):
     def getParser(self): return self._parser
     def getRecursionLimit(self): return self._recursion_limit
     def setRecursionLimit(self, limit): self._recursion_limit = limit
+    def getEncoding(self): return self._encoding
+    def setEncoding(self, encoding): self._encoding = encoding
     def parse(self, filename, depth=0):
         """Parse a TFF file to yield a TokenSet"""
         if hasattr(filename, 'read'):
@@ -410,15 +413,21 @@ class TFFParser(object):
             log.info('extracting TFF string from file "{}"'.format(filename))
             with open(filename, 'rt') as input_file:
                 input_string = input_file.read()
-        return self.parseString(input_string, depth=0)
+        return self.parseString(input_string, depth=depth)
     def parseHandle(self, file_handle, depth=0):
         """Parse a TFF file to yield a TokenSet"""
         log.info('extracting TFF string from file handle')
         input_string = file_handle.read()
-        return self.parseString(input_string, depth=0)
+        return self.parseString(input_string, depth=depth)
+    def parseURL(self, url, depth=0):
+        """Parse a TFF URL to yield a TokenSet"""
+        log.info('extracting TFF string from URL using encoding "{}"'.format(self.encoding))
+        with urlopen(url) as input_url:
+            input_string = input_url.read().decode(self.encoding)
+        return self.parseString(input_string, depth=depth)
     def parseString(self, input_string, depth=0):
         """Parse a TFF string to yield a TokenSet"""
-        log.info('parsing TFF string')        
+        log.info('parsing TFF string')    
         log.debug('TFF string:\n{}'.format(input_string))
         output_ts = TokenSet()
         # Open and parse the file:
@@ -428,7 +437,7 @@ class TFFParser(object):
             if s.getName() is 'assignment':
                 for resolved_name in output_ts.resolveString(s.token):
                     new_token = Token(resolved_name, s.token_values)
-                    log.info('assigning token  {}'.format(new_token.asText()))
+                    log.debug('assigning token  {}'.format(new_token.asText()))
                     output_ts.add(new_token)
             elif s.getName() is 'func_assignment':
                 if s.func is 'FILE':
@@ -446,7 +455,7 @@ class TFFParser(object):
                 elif s.func is 'SURL':
                     for resolved_url in output_ts.resolveString(s.argument):
                         log.info('reading simple data from from URL "{}"'.format(resolved_url))
-                        output_ts.add(Token.fromURL(s.token, resolved_url, simple=True))
+                        output_ts.add(Token.fromURL(s.token, resolved_url, simple=True, encoding=self.encoding))
                 else: raise NotImplementedError('Assignment from function {} not implemented yet'.format(s.func))
             elif s.getName() is 'mod':
                 if s.func is 'IMPORT':
@@ -457,10 +466,11 @@ class TFFParser(object):
                 elif s.func is 'REMOVE':
                     for resolved_name in output_ts.resolveString(s.argument):
                         if resolved_name in output_ts:
-                            log.info('removing token {}'.format(output_ts[resolved_name].asText()))
+                            log.debug('removing token {}'.format(output_ts[resolved_name].asText()))
                             del output_ts[resolved_name]
                         else: log.info('removing token "{}" failed: token not present'.format(resolved_name))
             else: raise NotImplementedError('Modifier function {} not implemented'.format(s.func))
         return output_ts
     recursionLimit = property(getRecursionLimit, setRecursionLimit, "The maximum permissibe recursion limit")
+    encoding = property(getEncoding, setEncoding, "The encoding to use when reading data from URL")
     parser = property(getParser, None, "The TFF DSL parser object")

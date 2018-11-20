@@ -18,12 +18,18 @@ from os.path import expanduser, expandvars
 import logging as log
 import json
 from collections import OrderedDict
+from urllib.request import urlopen
 
 class Template(object):
     @classmethod
     def fromFile(cls, filename, formatter=None):
         with open(filename, 'rt') as input_file:
             input_string = input_file.read()
+        return Template(string=input_string, formatter=formatter)
+    @classmethod
+    def fromURL(cls, url, formatter=None, encoding='UTF-8'):
+        with urlopen(url) as input_url:
+            input_string = input_url.read().decode(encoding)
         return Template(string=input_string, formatter=formatter)
     def __init__(self, string=None, formatter=None):
         self.string = string

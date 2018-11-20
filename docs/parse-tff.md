@@ -6,7 +6,7 @@ The `parse-tff` utility parses TFF-formatted token files. Although primarily a d
 
 ~~~
 usage: parse-tff [-h] [-v] [-V {error,warning,info,debug}]
-                 [-o {dict,JSON,TFF}] [-q | -a | -i | -g | -s str]
+                 [-o {dict,JSON,TFF}] [-e enc] [-q | -a | -i | -g | -s str]
                  [file [file ...]]
 
 Parse qsubsec token TFF files
@@ -21,6 +21,9 @@ optional arguments:
                         Set logging level (default warning)
   -o {dict,JSON,TFF}, --output-format {dict,JSON,TFF}
                         output format for single resolved token sets
+  -e enc, --url-encoding enc
+                        encoding to use when reading data from URLs (default
+                        UTF-8)
   -q, --quiet           do not print output
   -a, --print-all       output multiple resolved token sets in long format
   -i, --print-input     output combined parsed input before resolution
