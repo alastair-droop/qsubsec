@@ -68,7 +68,7 @@ def qsubsec():
     parser.add_argument('-e', '--url-encoding', dest='url_encoding', metavar='enc', default=defaults['url_encoding'], help='encoding to use when reading data from URLs (default {url_encoding})'.format(**defaults))
     # Submission options:
     submission_group = parser.add_argument_group('Submission options')
-    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default=defaults['submission_format'], choices=['qsub', 'bash', 'sbash'], help='the submission format to use when using -s (default {submission_format})'.format(**defaults))
+    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default=defaults['submission_format'], choices=['qsub', 'bash', 'pbash'], help='the submission format to use when using -s (default {submission_format})'.format(**defaults))
     submission_group.add_argument('--sub-exec', dest='submission_exec', metavar='exec', default=None, help='override the default executable to use when submitting with -s')
     submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=defaults['submission_timeout'], type=int, help='submission timeout in seconds when submitting with -s (default {submission_timeout})'.format(**defaults))
     submission_group.add_argument('-p', '--purge-logs', dest='purge_logs', action='store_true', default=False, help='purge section log files when submitting with -s')
@@ -217,7 +217,7 @@ def qsubsec():
     # Process the commands through the specified output formatter:
     if args.submission_format == 'qsub': formatter = sectionFormatter.QSUBFormatter
     elif args.submission_format == 'bash': formatter = sectionFormatter.BashFormatter
-    elif args.submission_format == 'sbash': formatter = sectionFormatter.BashFormatter    
+    elif args.submission_format == 'pbash': formatter = sectionFormatter.BashFormatter    
     else: error(log, 'no formatter for submission format {}'.format(args.submission_format))
     log.info('submission format is {}'.format(args.submission_format))
     if args.submit is False:    
@@ -232,12 +232,12 @@ def qsubsec():
         if submission_exec is None:
             if args.submission_format == 'qsub': submission_exec = 'qsub'
             elif args.submission_format == 'bash': submission_exec = 'bash'
-            elif args.submission_format == 'sbash': submission_exec = 'bash'
+            elif args.submission_format == 'pbash': submission_exec = 'bash'
             else: error(log, 'no submission executable set for format {}'.format(args.submission_format))
         # Determine how to submit:
-        if args.submission_format == 'bash': submission_method = outputSubmitterShell
-        elif args.submission_format == 'sbash': submission_method = outputSubmitterProc
-        elif args.submission_format == 'qsubsec': submission_method = outputSubmitterProc
+        if args.submission_format == 'qsub': submission_method = outputSubmitterProc
+        elif args.submission_format == 'bash': submission_method = outputSubmitterProc
+        elif args.submission_format == 'pbash': submission_method = outputSubmitterShell
         else: submission_method = outputSubmitterProc
         log.info('submitting {} formatted sections using executable "{}"'.format(len(sections), submission_exec))
         submission_exec = submission_exec.split()

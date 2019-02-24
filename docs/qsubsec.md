@@ -23,13 +23,14 @@ When using `-f qsub` the generated code will be passed to `qsub`.
 
 ### `-f bash`
 
-When using `-f bash`, each generated section is passed to a separate background shell subprocesses. `qsubsec` will not wait until one section completes before submitting the next. Thus, all sections will run concurrently. This allows for rapid execution of multiple templates, but runs the danger of filling up the local machine's resources.
+When using `-f bash`, each generated section is run sequentially the shell.
+
+### `-f pbash`
+
+When using `-f pbash`, each generated section is passed to a separate background shell subprocesses. `qsubsec` will not wait until one section completes before submitting the next. Thus, all sections will run concurrently. This allows for rapid execution of multiple templates, but runs the danger of filling up the local machine's resources.
 
 **NB**: the entire command is passed to bash as a single command string.
 
-### `-f sbash`
-
-When using `-f sbash`, each generated section is run in the shell, but unlike `-f bash` then are run sequentially.
 
 ## Usage
 
