@@ -18,7 +18,7 @@ setup(
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
         'Programming Language :: Python :: 3'
     ],
-    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'scripts', 'version'],
+    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'sectionSubmitter', 'scripts', 'version'],
     install_requires = [
         'pyparsing>=2.2.0'
     ],

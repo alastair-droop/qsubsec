@@ -14,6 +14,7 @@
 import tokens as qstokens
 from sections import SectionList, Limits, CommandType
 from templates import Template
+from sectionSubmitter import outputSubmitterProc, outputSubmitterShell
 from collections import OrderedDict
 import sectionFormatter
 import os.path
@@ -67,7 +68,7 @@ def qsubsec():
     parser.add_argument('-e', '--url-encoding', dest='url_encoding', metavar='enc', default=defaults['url_encoding'], help='encoding to use when reading data from URLs (default {url_encoding})'.format(**defaults))
     # Submission options:
     submission_group = parser.add_argument_group('Submission options')
-    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default=defaults['submission_format'], choices=['qsub', 'bash'], help='the submission format to use when using -s (default {submission_format})'.format(**defaults))
+    submission_group.add_argument('-f', '--sub-format', dest='submission_format', default=defaults['submission_format'], choices=['qsub', 'bash', 'sbash'], help='the submission format to use when using -s (default {submission_format})'.format(**defaults))
     submission_group.add_argument('--sub-exec', dest='submission_exec', metavar='exec', default=None, help='override the default executable to use when submitting with -s')
     submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=defaults['submission_timeout'], type=int, help='submission timeout in seconds when submitting with -s (default {submission_timeout})'.format(**defaults))
     submission_group.add_argument('-p', '--purge-logs', dest='purge_logs', action='store_true', default=False, help='purge section log files when submitting with -s')
@@ -216,6 +217,7 @@ def qsubsec():
     # Process the commands through the specified output formatter:
     if args.submission_format == 'qsub': formatter = sectionFormatter.QSUBFormatter
     elif args.submission_format == 'bash': formatter = sectionFormatter.BashFormatter
+    elif args.submission_format == 'sbash': formatter = sectionFormatter.BashFormatter    
     else: error(log, 'no formatter for submission format {}'.format(args.submission_format))
     log.info('submission format is {}'.format(args.submission_format))
     if args.submit is False:    
@@ -230,7 +232,13 @@ def qsubsec():
         if submission_exec is None:
             if args.submission_format == 'qsub': submission_exec = 'qsub'
             elif args.submission_format == 'bash': submission_exec = 'bash'
+            elif args.submission_format == 'sbash': submission_exec = 'bash'
             else: error(log, 'no submission executable set for format {}'.format(args.submission_format))
+        # Determine how to submit:
+        if args.submission_format == 'bash': submission_method = outputSubmitterShell
+        elif args.submission_format == 'sbash': submission_method = outputSubmitterProc
+        elif args.submission_format == 'qsubsec': submission_method = outputSubmitterProc
+        else: submission_method = outputSubmitterProc
         log.info('submitting {} formatted sections using executable "{}"'.format(len(sections), submission_exec))
         submission_exec = submission_exec.split()
         for i in range(len(sections)):
@@ -246,28 +254,12 @@ def qsubsec():
                         remove(sec_files[file_type])
                     except FileNotFoundError: pass
                     except: log.warning('failed to purge section {} file "{}"'.format(file_type, sec_files[file_type]))
-            # Attempt to open the subprocess:
-            try:
-                log.info('spawning subprocess "{}"'.format(' '.join(submission_exec)))
-                proc = subprocess.Popen(args=submission_exec, stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
-            except FileNotFoundError: error(log, 'subprocess executable "{}" not found'.format(submission_exec[0]))
-            except: error(log, 'failed to spawn subprocess "{}"'.format(' '.join(submission_exec)))
-            # Attempt to communicate with the subprocess:
+            #Attempt to spawn the subprocess:
             try:
                 print(info_str.format(i + 1, len(sections), section_name), file=stdout)
                 stdout.flush()
-                output_data = proc.communicate(input=section_data, timeout=args.submission_timeout)
-                log.info('submitted section {} of {} ({})'.format(i + 1, len(sections), section_name))
-                if output_data[0] != None: log.info('submission stdout: "{}"'.format(output_data[0].strip()))
-                if output_data[1] != None: log.info('submission stderr: "{}"'.format(output_data[1].strip()))
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.communicate()
-                log.warning('submission to subprocess "{}" timed out'.format(' '.join(submission_exec)))
-            except:
-                proc.kill()
-                proc.communicate()
-                log.warning('failed to submit job to subprocess "{}"'.format(' '.join(submission_exec)))
+                submission_method.spawn(proc_exec=submission_exec, data=section_data, timeout=args.submission_timeout)
+            except Exception as err: error(log, 'failed to submit job "{}"'.format(' '.join(submission_exec)))
 
 def parseTFF():
     # Define the defaults:

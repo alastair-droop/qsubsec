@@ -13,6 +13,24 @@ The stages in template processing are:
 
 If either of the template file or token files start with a well-formed URL scheme (for example `https://`), they will be treated as URLs. **NB**: Currently, URL processing is very  limited.
 
+## Submission Formats
+
+When using the `-s` flag to submit jobs, qsubsec will attempt to submit the generated template code using the specified format (specified using `-f`). Currently, there are three possible formats:
+
+### `-f qsub`
+
+When using `-f qsub` the generated code will be passed to `qsub`.
+
+### `-f bash`
+
+When using `-f bash`, each generated section is passed to a separate background shell subprocesses. `qsubsec` will not wait until one section completes before submitting the next. Thus, all sections will run concurrently. This allows for rapid execution of multiple templates, but runs the danger of filling up the local machine's resources.
+
+**NB**: the entire command is passed to bash as a single command string.
+
+### `-f sbash`
+
+When using `-f sbash`, each generated section is run in the shell, but unlike `-f bash` then are run sequentially.
+
 ## Usage
 
 ~~~
