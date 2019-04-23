@@ -132,7 +132,7 @@ class LSFFormatter(OutputFormatter):
     @classmethod
     def frontMatter(cls, section):
         output = []
-        output.append('{} -N {}'.format(cls.option_prefix, section.name))
+        output.append('{} -J {}'.format(cls.option_prefix, section.name))
         for limit, value in section.limits.limits.items():
             output.append('{} -l {}={}'.format(cls.option_prefix, limit, value))
         for option in section.options:
