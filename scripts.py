@@ -17,8 +17,8 @@ from templates import Template
 from sectionSubmitter import outputSubmitterProc, outputSubmitterShell
 from collections import OrderedDict
 import sectionFormatter
+import os
 import os.path
-from os import remove
 import logging
 import argparse
 import json
@@ -54,6 +54,17 @@ def setupLog(verbosity):
 def isURL(s):
     if urlparse(s).scheme != '': return True
     return False
+
+# A function to find (and load if found) the .qsubsecrc file:
+def loadRCFile(filename=None):
+    if filename is None: filename = os.path.join(os.path.expanduser('~'), '.qsubsecrc')
+    try:
+        ns = argparse.Namespace()
+        with open(filename, 'r') as rc_file:
+            rc_data = json.load(rc_file)
+            for i in rc_data.keys(): setattr(ns, i, rc_data[i])
+    except: ns = argparse.Namespace()
+    return ns
     
 def qsubsec():
     # Define the defaults:
@@ -83,8 +94,9 @@ def qsubsec():
     # Inputs:
     parser.add_argument(metavar='template', dest='template_file', help='template file or JSON-formatted section data')
     parser.add_argument(dest='tokens', nargs='*', default=None, help='Token definitions')
-    args = parser.parse_args()
-
+    args = loadRCFile() # First, attempt to read the default .qsubsecrc options file
+    args = parser.parse_args(namespace=args)
+    
     # A function to print an object in JSON fomat:
     def printJSON(x): print(json.dumps(x, indent='\t'))
 
@@ -252,7 +264,7 @@ def qsubsec():
                 for file_type in sec_files.keys():
                     try:
                         log.info('purging section {} file "{}"'.format(file_type, sec_files[file_type]))
-                        remove(sec_files[file_type])
+                        os.remove(sec_files[file_type])
                     except FileNotFoundError: pass
                     except: log.warning('failed to purge section {} file "{}"'.format(file_type, sec_files[file_type]))
             #Attempt to spawn the subprocess:
