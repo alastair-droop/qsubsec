@@ -62,6 +62,7 @@ class BashFormatter(OutputFormatter):
     def commands(cls, section):
         output = []
         for command in section.commands:
+            if command.include != True: continue
             if command.cmdtype is CommandType.log_out:
                 output.append('{0} >> {1}'.format(cls.echoString('{}'.format(command.command)), section.outfile.getFilename(section.name)))
             elif command.cmdtype is CommandType.log_err:
@@ -111,6 +112,7 @@ class QSUBFormatter(OutputFormatter):
     def commands(cls, section):
         output = []
         for command in section.commands:
+            if command.include != True: continue
             if command.cmdtype is CommandType.log_out:
                 output.append('{0} >> {1}'.format(cls.echoString('{}'.format(command.command)), section.outfile.getFilename(section.name)))
             elif command.cmdtype is CommandType.log_err:
@@ -160,6 +162,7 @@ class LSFFormatter(OutputFormatter):
     def commands(cls, section):
         output = []
         for command in section.commands:
+            if command.include != True: continue
             if command.cmdtype is CommandType.log_out:
                 output.append('{0} >> {1}'.format(cls.echoString('{}'.format(command.command)), section.outfile.getFilename(section.name)))
             elif command.cmdtype is CommandType.log_err:
