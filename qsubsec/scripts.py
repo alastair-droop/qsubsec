@@ -83,7 +83,9 @@ def qsubsec():
     submission_group.add_argument('--sub-exec', dest='submission_exec', metavar='exec', default=None, help='override the default executable to use when submitting with -s')
     submission_group.add_argument('--sub-timeout', dest='submission_timeout', metavar='sec', default=defaults['submission_timeout'], type=int, help='submission timeout in seconds when submitting with -s (default {submission_timeout})'.format(**defaults))
     submission_group.add_argument('-p', '--purge-logs', dest='purge_logs', action='store_true', default=False, help='purge section log files when submitting with -s')
-    submission_group.add_argument('-l', '--filter-commands', dest='filter_commands', metavar='regex', default=None, help='only include commands whose names match the regular expression regex. If regex is prefixed with ! then the regular expression is inverted')
+    submission_group.add_argument('-l', '--cmd-filter', dest='filter_commands', metavar='regex', default=None, help='only include commands whose names match the regular expression regex. If regex is prefixed with ! then the regular expression is inverted')
+    submission_group.add_argument('--cmd-start', dest='first_command', metavar='cmd', default=None, help='do not include any commands before the first instance of command cmd')
+    submission_group.add_argument('--cmd-end', dest='last_command', metavar='cmd', default=None, help='do not include any commands after the first instance of command cmd')
     # Output actions:
     output_group = parser.add_argument_group('Output actions')
     output_excl = output_group.add_mutually_exclusive_group()
@@ -170,30 +172,43 @@ def qsubsec():
     
         # Extract the section data from the template:
         sections = template.sections
-
-    # Limit to matching commands:
-    if args.filter_commands is not None:
-        # compile the regular expression:
-        try:
-            if args.filter_commands.startswith('!'):
-                args.filter_commands = args.filter_commands.lstrip('!')
-                log.info('inverting regular expression "{}"'.format(args.filter_commands))
-                invert = True
-            else: invert = False
-            log.info('filtering commands with regular expression "{}"'.format(args.filter_commands))
-            command_re = re.compile(args.filter_commands)
-        except: error(log, 'failed to parse the regular expression ({})'.format(args.filter_commands))
-        # Iterate through all commands (in reverse order per section) and remove those that do not match:
+    
+    # Limit commands, if necessary:
+    if (args.filter_commands is not None) or (args.first_command is not None) or (args.last_command is not None):
         for section in sections:
-            for command_i in reversed(range(len(section.commands))):
-                command_name = section.commands[command_i].name
-                match = command_re.match(command_name)
-                # if there is a match, then include them:
-                if ((match is None) and (invert is True)) or ((match is not None) and (invert is False)):
-                    log.debug('including matching command "{}"'.format(command_name))
-                else:
-                    log.debug('excluding non-matching command "{}"'.format(command_name))
-                    del(section.commands[command_i])
+            # If specified, turn off preceeding commands:
+            if args.first_command is not None:
+                if args.first_command not in section.commands.names: log.warning('invalid first command specified ({}); no commands will be selected'.format(args.first_command))
+                for cmd in section.commands:
+                    if cmd.cmdtype != CommandType.command: continue
+                    if cmd.name == args.first_command: break
+                    cmd.include = False
+            # If specified, turn off subsequent commands:
+            if args.last_command is not None:
+                if args.last_command not in section.commands.names: log.warning('invalid last command specified ({}); no commands will be selected'.format(args.last_command))
+                for i in range(len(section.commands)):
+                    cmd = section.commands[-i] # Iterate backwards
+                    if cmd.cmdtype != CommandType.command: continue
+                    if cmd.name == args.last_command: break
+                    cmd.include = False
+            # If specified, limit to commands matching regular expression:
+            if args.filter_commands is not None:
+                # compile the regular expression:
+                try:
+                    if args.filter_commands.startswith('!'):
+                        args.filter_commands = args.filter_commands.lstrip('!')
+                        log.info('inverting regular expression "{}"'.format(args.filter_commands))
+                        invert = True
+                    else: invert = False
+                    log.info('filtering commands with regular expression "{}"'.format(args.filter_commands))
+                    command_re = re.compile(args.filter_commands)
+                except: error(log, 'failed to parse the regular expression ({})'.format(args.filter_commands))
+                # Match against regular expression:
+                for cmd in section.commands:
+                    if cmd.cmdtype != CommandType.command: continue
+                    match = command_re.match(cmd.name)
+                    if ((match is None) and (invert is False)) or ((match is not None) and (invert is True)):
+                        cmd.include = False
 
     # If requested, print out the section descriptions:
     if args.show_sections is True:
@@ -217,6 +232,7 @@ def qsubsec():
         for section in sections:
             for command in section.commands:
                 if command.cmdtype != CommandType.command: continue
+                if command.include != True: continue
                 print('{} :: {}:\t{}'.format(section.name, command.name, command.command))
         exit(0)
 

@@ -162,6 +162,7 @@ class Command(object):
         self.name = name
         self.log = log
         self.test = test
+        self.include = True
     def getType(self): return self._cmdtype
     def setType(self, cmdtype): self._cmdtype = cmdtype
     def getCommand(self): return self._command
@@ -172,6 +173,8 @@ class Command(object):
     def setTest(self, test): self._test = bool(test)
     def getName(self): return self._name
     def setName(self, name): self._name = name
+    def getInclude(self): return self._include
+    def setInclude(self, include): self._include = bool(include)
     def asDict(self):
         output = OrderedDict()
         output['type'] = self.cmdtype.name
@@ -186,6 +189,7 @@ class Command(object):
     log = property(getLog, setLog, doc='Should the command log its status?')
     test = property(getTest, setTest, doc='Should the command test for completion?')
     name = property(getName, setName, doc='The QSUB command Name')
+    include = property(getInclude, setInclude, doc='Include command in output?')
     json = property(asJSON, None, "The command in JSON format")
 
 class CommandList(object):
@@ -196,6 +200,11 @@ class CommandList(object):
         self._commands = []
         for command in commands:
             self.append(command)
+    def getNames(self):
+        output = []
+        for command in self._commands:
+            output.append(command.name)
+        return output
     def append(self, new):
         if not isinstance(new, Command): raise TypeError('invalid command type')
         self._commands.append(new)
@@ -212,6 +221,7 @@ class CommandList(object):
     def __delitem__(self, key): del(self.commands[key])
     def __iter__(self): return iter(self.commands)
     commands = property(getCommands, setCommands, "The commands in the list")
+    names = property(getNames, None, "The command names in the list")
     json = property(asJSON, None, "The command list in JSON format")
 
 class Section(object):
