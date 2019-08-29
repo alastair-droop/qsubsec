@@ -35,7 +35,7 @@ When using `-f pbash`, each generated section is passed to a separate background
 ## Usage
 
 ~~~
-usage: qsubsec [-h] [-v] [-V {error,warning,info,debug}] [-r] [-i] [-j]
+usage: qsubsec [-h] [-V] [-v {error,warning,info,debug}] [-r] [-i] [-j]
                [-e enc] [-f {qsub,bash}] [--sub-exec exec] [--sub-timeout sec] [-p]
                [-l regex] [-t | -d | -c | -s]
                template [tokens [tokens ...]]
@@ -48,8 +48,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -v, --version         show program's version number and exit
-  -V {error,warning,info,debug}, --verbose {error,warning,info,debug}
+  -V, --version         show program's version number and exit
+  -v {error,warning,info,debug}, --verbose {error,warning,info,debug}
                         Set logging level (default warning)
   -r, --raise-errors    raise full errors when processing templates
   -i, --input-json      input JSON-formatted section data instead of template

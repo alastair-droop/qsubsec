@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os.path
 
 # Get the version:
 version = {}
-with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'version.py')) as f: exec(f.read(), version)
+with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'qsubsec', 'version.py')) as f: exec(f.read(), version)
 
 setup(
     name = 'qsubsec',
@@ -18,16 +18,17 @@ setup(
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
         'Programming Language :: Python :: 3'
     ],
-    py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'sectionSubmitter', 'scripts', 'version'],
+    # py_modules = ['tokens', 'sections', 'templates', 'sectionFormatter', 'sectionSubmitter', 'scripts', 'version'],
+    packages = find_packages(),
     install_requires = [
         'pyparsing>=2.2.0'
     ],
     python_requires = '>=3',
     entry_points = {
         'console_scripts': [
-            'qsubsec=scripts:qsubsec',
-            'parse-tff=scripts:parseTFF',
-            'update-template=scripts:updateTemplate'
+            'qsubsec=qsubsec.scripts:qsubsec',
+            'parse-tff=qsubsec.scripts:parseTFF',
+            'update-template=qsubsec.scripts:updateTemplate'
         ]
     }
 )

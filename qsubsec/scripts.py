@@ -71,8 +71,8 @@ def qsubsec():
     defaults = {'verbosity_level':'warning', 'submission_format':'qsub', 'submission_timeout':None, 'url_encoding':'UTF-8'}
     # Create the command line interface:
     parser = argparse.ArgumentParser(description='Expand QSUB section templates')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
-    parser.add_argument('-V', '--verbose', dest='verbosity_level', default=defaults['verbosity_level'], choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default {verbosity_level})'.format(**defaults))
+    parser.add_argument('-V', '--version', action='version', version='%(prog)s {0}'.format(version['__version__']))
+    parser.add_argument('-v', '--verbose', dest='verbosity_level', default=defaults['verbosity_level'], choices=['error', 'warning', 'info', 'debug'], help='Set logging level (default {verbosity_level})'.format(**defaults))
     parser.add_argument('-r', '--raise-errors', dest='raise_errors', action='store_true', default=False, help='raise full errors when processing templates')
     parser.add_argument('-i', '--input-json', dest='input_json', action='store_true', default=False, help='input JSON-formatted section data instead of template file')
     parser.add_argument('-j', '--output-json', dest='output_json', action='store_true', default=False, help='return data in JSON format')
