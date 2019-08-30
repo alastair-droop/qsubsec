@@ -15,7 +15,7 @@ import qsubsec.tokens as qstokens
 from qsubsec.sections import SectionList, Limits, CommandType
 from qsubsec.templates import Template
 from qsubsec.sectionSubmitter import outputSubmitterProc, outputSubmitterShell
-import qsubsec.sectionFormatter
+import qsubsec.sectionFormatter 
 from collections import OrderedDict
 import os
 import os.path
@@ -66,7 +66,7 @@ def loadRCFile(filename=None):
     except: ns = argparse.Namespace()
     return ns
     
-def qsubsec():
+def qsmain():
     # Define the defaults:
     defaults = {'verbosity_level':'warning', 'submission_format':'qsub', 'submission_timeout':None, 'url_encoding':'UTF-8'}
     # Create the command line interface:
@@ -156,7 +156,7 @@ def qsubsec():
                 tokens.extend(ts_new)
             except qstokens.MissingTokenError as err: error(log, 'missing tokens "{}" in file "{}"'.format('", "'.join(err.tokens), f_path))
             except BaseException as err: error(log, str(err))
-
+        
         # Execute the template to yield the sections:
         log.info('executing template')
         try: template.execute(tokens)
@@ -243,10 +243,10 @@ def qsubsec():
         exit(0)
     
     # Process the commands through the specified output formatter:
-    if args.submission_format == 'qsub': formatter = sectionFormatter.QSUBFormatter
-    elif args.submission_format == 'bsub': formatter = sectionFormatter.LSFFormatter
-    elif args.submission_format == 'bash': formatter = sectionFormatter.BashFormatter
-    elif args.submission_format == 'pbash': formatter = sectionFormatter.BashFormatter    
+    if args.submission_format == 'qsub': formatter = qsubsec.sectionFormatter.QSUBFormatter
+    elif args.submission_format == 'bsub': formatter = qsubsec.sectionFormatter.LSFFormatter
+    elif args.submission_format == 'bash': formatter = qsubsec.sectionFormatter.BashFormatter
+    elif args.submission_format == 'pbash': formatter = qsubsec.sectionFormatter.BashFormatter    
     else: error(log, 'no formatter for submission format {}'.format(args.submission_format))
     log.info('submission format is {}'.format(args.submission_format))
     if args.submit is False:    

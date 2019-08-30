@@ -26,7 +26,7 @@ setup(
     python_requires = '>=3',
     entry_points = {
         'console_scripts': [
-            'qsubsec=qsubsec.scripts:qsubsec',
+            'qsubsec=qsubsec.scripts:qsmain',
             'parse-tff=qsubsec.scripts:parseTFF',
             'update-template=qsubsec.scripts:updateTemplate'
         ]
