@@ -11,7 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from sections import Requirement, CommandType
+from qsubsec.sections import Requirement, CommandType
 from os import remove
 from collections import OrderedDict
 import logging as log

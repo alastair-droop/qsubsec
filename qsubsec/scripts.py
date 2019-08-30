@@ -11,12 +11,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import tokens as qstokens
-from sections import SectionList, Limits, CommandType
-from templates import Template
-from sectionSubmitter import outputSubmitterProc, outputSubmitterShell
+import qsubsec.tokens as qstokens
+from qsubsec.sections import SectionList, Limits, CommandType
+from qsubsec.templates import Template
+from qsubsec.sectionSubmitter import outputSubmitterProc, outputSubmitterShell
+import qsubsec.sectionFormatter
 from collections import OrderedDict
-import sectionFormatter
 import os
 import os.path
 import logging

@@ -11,8 +11,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import tokens as qstokens
-from sections import Option, CommandType, Section, SectionList
+import qsubsec.tokens as qstokens
+from qsubsec.sections import Option, CommandType, Section, SectionList
 from os import makedirs
 from os.path import expanduser, expandvars
 import logging as log
